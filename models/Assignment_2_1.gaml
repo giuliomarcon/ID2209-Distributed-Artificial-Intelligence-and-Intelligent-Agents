@@ -14,10 +14,15 @@ global {
 	point ExitLocation <-{100,100};
 	point Shop1 <- {20, 10};
 	point Shop2 <- {30, 10};
+	point Shop3 <- {40, 10};
 
 	
 	string informStartAcutionMSG_dutch <- 'inform-start-of-auction-dutch';
 	string informStartAcutionMSG_FPSBA <- 'inform-start-of-auction-first-price-saled-bid';
+	string informStartAcutionMSG_japanese <- 'inform-start-of-auction-japanese';
+	
+	string japaneseStartACK <- 'japanese-start-ack';
+	
 	string informEndAcutionFailedMSG <- 'auction-failed';
 	string wonActionMSG <- 'won-auction';
 	string lostActionMSG <- 'lost-auction';
@@ -27,7 +32,11 @@ global {
 	
 	int nbOfDutchParticipants <- 0;
 	int nOfFPSAPartecipants <- 0;
-	int totFPSBAbidders <- 5;
+	int nOfJapanesePartecipants <- 0;
+	
+	int totDutchBidders <- 5;
+	int totFPSBABidders <- 5;
+	int totJapaneseBidders <- 5;
 	
 	// number of vist at each shop before quitting
 	int threshold <- 100;
@@ -39,6 +48,9 @@ global {
 		}
 		create InitiatorSealedBid number: 1{
 			location <- Shop2;
+		}
+		create InitiatorJapanese number: 1{
+			location <- Shop3;
 		}
 		
 		create Entrance number: 1{
@@ -54,23 +66,35 @@ global {
 		}
 
 	}
-	//reflex spawnDutchPartecipant when: nbOfDutchParticipants<5{
-	reflex spawnDutchPartecipant when: nbOfDutchParticipants<5{
+
+	reflex spawnDutchPartecipant when: nbOfDutchParticipants<totDutchBidders{
 		create ParticipantDutch number: 1{
+			write "created Dutch partecipant";
 			location <- EntranceLocation;
 			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
 		}
 		nbOfDutchParticipants <- nbOfDutchParticipants +1;
 	}
 	
-	reflex spawnFPSBAPartecipant when: nOfFPSAPartecipants<totFPSBAbidders{
+	reflex spawnFPSBAPartecipant when: nOfFPSAPartecipants<totFPSBABidders{
 		create PartecipantSealedBid number: 1{
-			write "created partecipant";
+			write "created FPSBA partecipant";
 			location <- EntranceLocation;
 			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
 			
 		}
 		nOfFPSAPartecipants <- nOfFPSAPartecipants+1;
+	}
+	
+	reflex spawnJapanaesePArtecipant when: nOfJapanesePartecipants<totJapaneseBidders{
+		create PartecipantJapanese number: 1{
+			write "created japanese partecipant";
+			location <- EntranceLocation;
+			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
+			
+		}
+		nOfJapanesePartecipants <- nOfJapanesePartecipants+1;
+		
 	}
 	
 	reflex globalPrint{
@@ -175,6 +199,7 @@ species PartecipantSealedBid parent: Participant{
 		write ('requestWhens   ('+length(requestWhens   ));
 		write ('subscribes   ('+length(subscribes   ));
 	}
+
 	
 	//reflex auctionStarted when: !empty(informs) and step = 0{
 	reflex auctionStarted when: !empty(informs) and step = 0 {
@@ -223,6 +248,51 @@ species PartecipantSealedBid parent: Participant{
 	
 }
 
+species PartecipantJapanese parent:Participant{
+	float avgMaxPrice <- 800.0;
+	float varianceMaxPrice <- 75.0;
+	float lastProposedPrice;
+	float maxPrice;
+	
+	reflex startAuction when: !empty(informs) and step = 0{
+		busy <- true;
+		targetPoint <- Shop3;
+		message startAuctionMSG <- informs[0];
+		lastProposedPrice<-0.0;
+	
+	
+		if (startAuctionMSG.contents[0]=informStartAcutionMSG_japanese){
+			step<-1;
+			maxPrice<-rnd(avgMaxPrice-varianceMaxPrice,avgMaxPrice+varianceMaxPrice);
+			
+			write '(Time ' + time + '): ' +name + ': going to shop at max price'+maxPrice color:#blue;
+			do inform message: startAuctionMSG contents: [japaneseStartACK];
+		}
+	}
+	 
+	reflex receivedProposal when: !empty(proposes){
+		message proposeM <- proposes[0];
+		lastProposedPrice<-float(proposeM.contents[0]);
+		
+		write '(Time ' + time + '): ' + name+'received proposed '+lastProposedPrice color:#blue;
+		if(lastProposedPrice<maxPrice){
+			do accept_proposal message: proposeM contents:[];
+		}else{
+			write '(Time ' + time + '): ' +name + ': rejectd' color:#blue;
+			busy<-false;
+			targetPoint <- Shop3;
+			do reject_proposal message: proposeM contents:[];
+		}
+	}
+	
+	
+	reflex finishAuction when: !empty(informs) and step = 1{
+		message finishAuctionMSG <- informs[0];
+		write '(Time ' + time + '): ' + name +': I won the action at price: '+lastProposedPrice;
+		do end_conversation message: finishAuctionMSG contents:[];
+		step<-0;
+	}
+}
 
 species InitiatorDutch skills: [fipa] {
 	float initialPrice <- 1000.0;
@@ -234,7 +304,8 @@ species InitiatorDutch skills: [fipa] {
 	
 	
 	bool start_auction <- false;
-
+	
+	//TODO check all the partecipat are spawned
 	reflex startAuction when: nbOfDutchParticipants>0 and (start_auction = false) {
 		
 		start_auction <- flip(0);
@@ -368,8 +439,8 @@ species InitiatorSealedBid skills:[fipa]{
 //		write "##### log propose"+proposes;
 //	}
 //	
-	reflex startAuction when: (start_auction = false and length(PartecipantSealedBid) = totFPSBAbidders) {
-		start_auction <- flip(0.005);
+	reflex startAuction when: (start_auction = false and length(PartecipantSealedBid) = totFPSBABidders) {
+		start_auction <- flip(0);
 		
 		if start_auction{
 			write '(Time ' + time + '): ' + name +'Starting new Saled Bid Auction! to('+length(PartecipantSealedBid)+')'+PartecipantSealedBid color:#yellow;
@@ -453,6 +524,77 @@ species InitiatorSealedBid skills:[fipa]{
 	
 }
 
+species InitiatorJapanese skills: [fipa]{
+	float reserve <- 300.0;
+	float increasingStep <- 10.0;
+	float price;
+	
+	bool start_auction <- false;
+	int totalBidder <- 0;
+	list<PartecipantJapanese> activeBidders;
+	list<PartecipantJapanese> silentBidders;
+	
+	reflex startAuction when: (start_auction = false and length(PartecipantJapanese) = totJapaneseBidders) {
+		start_auction <- flip(0.005);
+		
+		if start_auction{
+			write '(Time ' + time + '): ' + name +'Starting new Japanese Bid Auction! to('+length(PartecipantJapanese)+')'+PartecipantJapanese color:#blue;
+			write '(Time ' + time + '): ' + name +'reserve:'+reserve color:#blue;
+			
+			write list(PartecipantJapanese) color:#blue;
+
+			do start_conversation 	to: list(PartecipantJapanese)
+			 						protocol: 'fipa-contract-net' 
+									performative: 'inform' 
+									contents: [informStartAcutionMSG_japanese] ;
+			activeBidders <- copy(PartecipantJapanese);
+			totalBidder <- length(activeBidders);
+			
+			price <- reserve;
+			step <- 1;
+		}
+	
+	}
+	
+	reflex updatePrice when:(step = 1) and (length(activeBidders at_distance 3)=totalBidder) and !empty(informs) and length(informs)=totalBidder {
+		
+		write '(Time ' + time + '): ' + name + ' sends a propose message to all participants:'+price;
+		price <- price;
+		loop m over: informs {
+			write '(Time ' + time + '): ' + name +' informing :'+m.sender+' the riserve price:'+reserve color:#blue;
+			do propose message: m contents: [price] ;
+		}
+		step <- 2;
+	}
+	
+	reflex receiveRejection when: !empty(reject_proposals) and step=2{
+		loop m over: reject_proposals {
+			totalBidder<-totalBidder-1;
+			remove m.sender from: activeBidders;
+			add m.sender to: silentBidders;
+			do end_conversation message: m contents: [] ;
+			//make bidder free to go dance
+		}
+		
+	}
+	
+	reflex receivedAllAcceptance when: !empty(accept_proposals) and totalBidder>1 and (length(activeBidders)) = totalBidder{
+		price <- price + increasingStep;
+		loop m over: accept_proposals {
+			do propose message: m contents: [price] ;
+		}
+	}
+	
+	reflex finishedAuction when: ! empty(accept_proposals) and (length(silentBidders)+1) = totJapaneseBidders{
+		do inform message: accept_proposals[0] contents: [wonActionMSG];
+	}
+	
+	aspect default{
+		draw cube(3) at: location color: #blue;
+	}
+	
+}
+
 species Entrance{
 	
 	aspect default{
@@ -488,8 +630,10 @@ experiment Festival type: gui {
 		display map type: opengl {
 			species ParticipantDutch;
 			species PartecipantSealedBid;
+			species PartecipantJapanese;
 			species InitiatorDutch;
 			species InitiatorSealedBid;
+			species InitiatorJapanese;
 			species Entrance;
 			species Exit;
 			species EnormousStage;
