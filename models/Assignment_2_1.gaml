@@ -23,6 +23,8 @@ global {
 	string lostActionMSG <- 'lost-auction';
 	string acceptProposal <-'accepted-proposal';
 	string refusedProposal <-'rejected-proposal';
+	
+	
 	int nbOfDutchParticipants <- 0;
 	int nOfFPSAPartecipants <- 0;
 	int totFPSBAbidders <- 5;
@@ -35,7 +37,7 @@ global {
 		create InitiatorDutch number: 1{
 			location <- Shop1;
 		}
-		create InitiatorSaledBid number: 1{
+		create InitiatorSealedBid number: 1{
 			location <- Shop2;
 		}
 		
@@ -56,20 +58,16 @@ global {
 	reflex spawnDutchPartecipant when: nbOfDutchParticipants<5{
 		create ParticipantDutch number: 1{
 			location <- EntranceLocation;
-//			busy <- true;
-//			targetPoint <- {4,30};
 			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
 		}
 		nbOfDutchParticipants <- nbOfDutchParticipants +1;
 	}
 	
 	reflex spawnFPSBAPartecipant when: nOfFPSAPartecipants<totFPSBAbidders{
-		create PartecipantSaledBid number: 1{
+		create PartecipantSealedBid number: 1{
 			write "created partecipant";
 			location <- EntranceLocation;
-			busy <- true;
-//			targetPoint <- {4,30};
-			targetPoint<-EnormousLocation+{rnd(-20,20),rnd(10,-20)};
+			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
 			
 		}
 		nOfFPSAPartecipants <- nOfFPSAPartecipants+1;
@@ -80,11 +78,11 @@ global {
 	}
 }
 
-species ParticipantDutch skills:[moving,fipa]{
-	rgb guestColor <- #red;
-		
+species Participant skills:[moving,fipa]{
 	point targetPoint <- nil;
 	bool busy <- false;
+	
+	int step<-0;
 			
 	reflex beIdle when: targetPoint = nil{
 		do wander;
@@ -95,13 +93,12 @@ species ParticipantDutch skills:[moving,fipa]{
 //		}
 		
 	}
-
 	
 	reflex moveToTarget when: targetPoint != nil {
 		do goto target:targetPoint;
-	}	
+	}
 	
-//	reflex arrivedToExit when:  location distance_to(ExitLocation) < 1 {
+	//	reflex arrivedToExit when:  location distance_to(ExitLocation) < 1 {
 //		busy<-true;
 //		nbOfParticipants <- nbOfParticipants-1;
 //		write 'arrived exit'+nbOfParticipants;
@@ -113,7 +110,10 @@ species ParticipantDutch skills:[moving,fipa]{
 		targetPoint <- nil;
 	}
 	
-	int step<-0;
+}
+
+species ParticipantDutch parent: Participant{
+	rgb guestColor <- #green;
 	int maxPrice <-rnd(750,950);
 	
 	// TODO fix
@@ -150,6 +150,80 @@ species ParticipantDutch skills:[moving,fipa]{
 	}
 }
 
+species PartecipantSealedBid parent: Participant{
+	rgb guestColor <- #yellow;			
+
+	float esitmatedValue<- 1000.0;
+	float variation<- 0.33;
+	float bid;
+	message startAuctionMSG ;
+	reflex log when:false{
+		write ('(Time ' + time + '): ' +name + ' LOG:');
+		write ('accept_proposals ('+length(accept_proposals ));
+		write ('agrees  ('+length(agrees  ));
+		write ('cancels  ('+length(cancels  ));
+		write ('cfps  ('+length(cfps  ));
+		write ('conversations  ('+length(conversations  ));
+		write ('failures  ('+length(failures  ));
+		write ('informs   ('+length(informs   ));
+		write ('proposes   ('+length(proposes   ));
+		write ('queries   ('+length(queries   ));
+		write ('refuses   ('+length(refuses   ));
+		write ('failures  ('+length(failures  ));
+		write ('reject_proposals   ('+length(reject_proposals   ));
+		write ('requests   ('+length(requests   ));
+		write ('requestWhens   ('+length(requestWhens   ));
+		write ('subscribes   ('+length(subscribes   ));
+	}
+	
+	//reflex auctionStarted when: !empty(informs) and step = 0{
+	reflex auctionStarted when: !empty(informs) and step = 0 {
+		busy <- true;
+		targetPoint <- Shop2;
+		startAuctionMSG <- informs[0];
+		
+	
+		write '(Time ' + time + '): ' +name + ': going to shop ';
+	
+		if (startAuctionMSG.contents[0]=informStartAcutionMSG_FPSBA){
+			step<-1;
+		}
+	
+	}
+	
+	reflex makeBid when:location distance_to(Shop2) < 2 and step=1{
+		bid <- rnd(esitmatedValue*(1-variation),esitmatedValue*(1+variation));
+		write ('(Time ' + time + '): ' +name + ' making bid at:'+bid);
+		do propose message: startAuctionMSG contents: [bid] ;
+		step<-2;	
+		
+	}
+	
+
+	
+	reflex wonAuction when:!empty(accept_proposals){
+		write ('(Time ' + time + '): ' +name + ' I won the aution making bid at:'+bid+'-'+accept_proposals[0]);
+		do end_conversation message: accept_proposals[0] contents: [ (wonActionMSG)] ;
+		step<-0;
+		remove 0 from: accept_proposals;
+		write 'acceptance:'+accept_proposals;
+	}
+	reflex lostAuction when:!empty(reject_proposals ){
+		write ('(Time ' + time + '): ' +name + ' I lost the aution making bid at:'+bid+' - '+reject_proposals[0]);
+		do end_conversation message: reject_proposals[0] contents: [ (wonActionMSG)] ;
+		step<-0;
+		remove 0 from:reject_proposals;
+		write 'rejected:'+reject_proposals;
+		
+	}
+	aspect default{
+		draw pyramid(1) at: location color: guestColor;
+		draw sphere(0.5) at: location+{0,0,1} color: guestColor;
+	}
+	
+}
+
+
 species InitiatorDutch skills: [fipa] {
 	float initialPrice <- 1000.0;
 	float price <- initialPrice;
@@ -163,7 +237,7 @@ species InitiatorDutch skills: [fipa] {
 
 	reflex startAuction when: nbOfDutchParticipants>0 and (start_auction = false) {
 		
-		start_auction <- flip(0.005);
+		start_auction <- flip(0);
 		if start_auction{
 			write "dutch auction started" color: #red;
 			do start_conversation 	to: list(ParticipantDutch)
@@ -274,66 +348,8 @@ species InitiatorDutch skills: [fipa] {
 	}
 }
 
-species PartecipantSaledBid skills:[fipa]{
-	rgb guestColor <- #green;			
-	point targetPoint <- nil;
-	bool busy <- false;
-	float esitmatedValue<- 1000.0;
-	float variation<- 0.33;
-	float bid <- rnd(esitmatedValue*(1-variation),esitmatedValue*(1+variation));
-	
-	reflex log when:false{
-		write ('(Time ' + time + '): ' +name + ' LOG:');
-		write ('accept_proposals ('+length(accept_proposals ));
-		write ('agrees  ('+length(agrees  ));
-		write ('cancels  ('+length(cancels  ));
-		write ('cfps  ('+length(cfps  ));
-		write ('conversations  ('+length(conversations  ));
-		write ('failures  ('+length(failures  ));
-		write ('informs   ('+length(informs   ));
-		write ('proposes   ('+length(proposes   ));
-		write ('queries   ('+length(queries   ));
-		write ('refuses   ('+length(refuses   ));
-		write ('failures  ('+length(failures  ));
-		write ('reject_proposals   ('+length(reject_proposals   ));
-		write ('requests   ('+length(requests   ));
-		write ('requestWhens   ('+length(requestWhens   ));
-		write ('subscribes   ('+length(subscribes   ));
-	}
-	
-	//reflex auctionStarted when: !empty(informs) and step = 0{
-	reflex auctionStarted when: !empty(informs) {
-		busy <- true;
-		targetPoint <- Shop2;
-		
-		message startedAuction <-  informs[0];
-	
-		if (startedAuction.contents[0]=informStartAcutionMSG_FPSBA){
-			write ('(Time ' + time + '): ' +name + ' Auction started making bid at:'+bid);
-			write ('(Time ' + time + '): ' +name + ' replying to'+startedAuction);
-			do propose message: startedAuction contents: [bid] ;	
-		}
-	
-	}
-	
-	reflex wonAuction when:!empty(accept_proposals){
-		message tmp <- accept_proposals[0];
-		write 'acceptance:'+accept_proposals;
-		write ('(Time ' + time + '): ' +name + ' I won the aution making bid at:'+bid+'-'+accept_proposals[0]);
-		remove accept_proposals[0] from: accept_proposals;
-		write 'acceptance:'+accept_proposals;
-	}
-	reflex lostAuction when:!empty(reject_proposals ){
-		message tmp <- reject_proposals[0];
-		write 'rejected:'+reject_proposals;
-		write ('(Time ' + time + '): ' +name + ' I lost the aution making bid at:'+bid+' - '+reject_proposals[0]);
-		remove reject_proposals[0] from:reject_proposals;
-		write 'rejected:'+reject_proposals;
-	}
-	
-}
 
-species InitiatorSaledBid skills:[fipa]{
+species InitiatorSealedBid skills:[fipa]{
 	bool start_auction <- false;
 	int step <- 0;
 	
@@ -352,13 +368,13 @@ species InitiatorSaledBid skills:[fipa]{
 //		write "##### log propose"+proposes;
 //	}
 //	
-	reflex startAuction when: (start_auction = false and length(PartecipantSaledBid) = totFPSBAbidders) {
-		start_auction <- flip(1);
+	reflex startAuction when: (start_auction = false and length(PartecipantSealedBid) = totFPSBAbidders) {
+		start_auction <- flip(0.005);
 		
 		if start_auction{
-			write '(Time ' + time + '): ' + name +'Starting new Saled Bid Auction! to('+length(PartecipantSaledBid)+')'+PartecipantSaledBid;
+			write '(Time ' + time + '): ' + name +'Starting new Saled Bid Auction! to('+length(PartecipantSealedBid)+')'+PartecipantSealedBid color:#yellow;
 			
-			totalBidder <- length(PartecipantSaledBid);
+			totalBidder <- length(PartecipantSealedBid);
 			bids<-nil;
 			receivedOffers <- 0;
 			bestOffer <- 0.0;
@@ -369,17 +385,19 @@ species InitiatorSaledBid skills:[fipa]{
 //								performative: 'inform' 
 //								contents: [ (informStartAcutionMSG_FPSBA)] ;
 
-			do start_conversation 	to: list(PartecipantSaledBid)
+			do start_conversation 	to: list(PartecipantSealedBid)
 			 						protocol: 'fipa-contract-net' 
 									performative: 'inform' 
 									contents: [ (informStartAcutionMSG_FPSBA)] ;
 				
-			}
+			
 			step <- 1;
+		}
 	
 	}
 	
 	reflex receiveOffers when:!empty(proposes) {//and step=1 {
+		write 'receiveOffers reflex';
 		loop m over: proposes {
 			
 			add m to: bids;
@@ -396,31 +414,38 @@ species InitiatorSaledBid skills:[fipa]{
 	}
 	
 	reflex reicivingFinished when: (totalBidder = receivedOffers) and step=1{
-		step <-2 ;
+		write 'reicivingFinished reflex';
 		write('(Time ' + time + '): ' + name+':all partecipants have bidded, best offer:'+bestOffer+' from:'+bestBidMSG.sender);
 		write('(Time ' + time + '): ' + name+':sayng to'+bestBidMSG.sender+'it won');
 		write('(Time ' + time + '): bestBidMSG:'+bestBidMSG);
 		//do accept_proposal message: bestBidMSG contents: [ (wonActionMSG)] ;
 		do accept_proposal message: bestBidMSG contents: [ (wonActionMSG)] ;
-		do end_conversation message: bestBidMSG contents: [ (wonActionMSG)] ;
+		//do end_conversation message: bestBidMSG contents: [ (wonActionMSG)] ;
 		
 		remove bestBidMSG from: bids;
 		loop m over: bids {
 			write('(Time ' + time + '): ' + name+':saying to :'+m.sender+' it lost');
 			do reject_proposal message: m contents: [ (lostActionMSG)] ;
-			do end_conversation message: m contents: [ (lostActionMSG)] ;
+		//	do end_conversation message: m contents: [ (lostActionMSG)] ;
 			
 		}
-		step <- 2;
+		step <- 0;
+		start_auction <- false;
+		
+		ask PartecipantSealedBid{
+			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
+			busy <- false;
+		}
 		
 	}
 	
-	reflex restartAuction when: (step = 2){
-		bool restart_auction <- flip(0.005);
-		if restart_auction{
-			step <- 0;
-		}
-	}
+//	reflex restartAuction when: (step = 2){
+//		write 'restartAuction reflex';
+//		bool restart_auction <- flip(0.005);
+//		if restart_auction{
+//			step <- 0;
+//		}
+//	}
 	
 	aspect default{
 		draw cube(3) at: location color: #yellow;
@@ -462,11 +487,12 @@ experiment Festival type: gui {
 	output {
 		display map type: opengl {
 			species ParticipantDutch;
+			species PartecipantSealedBid;
+			species InitiatorDutch;
+			species InitiatorSealedBid;
 			species Entrance;
 			species Exit;
 			species EnormousStage;
-			species InitiatorDutch;
-
 		}
 	}
 }
