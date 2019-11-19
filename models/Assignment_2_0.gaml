@@ -49,9 +49,9 @@ global {
 	reflex spawnPartecipant when: nbOfParticipants<5{
 		create Participant number: 1{
 			location <- EntranceLocation;
-			busy <- true;
+//			busy <- true;
 //			targetPoint <- {4,30};
-			targetPoint<-EnormousLocation+{rnd(-20,20),rnd(10,-20)};
+			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
 		}
 		nbOfParticipants <- nbOfParticipants +1;
 	}
@@ -67,8 +67,8 @@ species Participant skills:[moving,fipa]{
 	point targetPoint <- nil;
 	bool busy <- false;
 			
-	reflex beIdle when: busy = false{
-//		do wander;
+	reflex beIdle when: targetPoint = nil{
+		do wander;
 		
 //		if time>=1 {
 //			busy <- true;
@@ -89,8 +89,8 @@ species Participant skills:[moving,fipa]{
 //		do die;
 //	}
 //	
-	reflex arrivedToStage when: busy=true and location distance_to(EnormousLocation) < 10.5 {
-		busy <- false;
+	reflex arrivedToStage when: location distance_to(EnormousLocation) < 5.5 and busy = false {
+//		busy <- false;
 		targetPoint <- nil;
 	}
 	
@@ -145,6 +145,7 @@ species Initiator skills: [fipa] {
 		
 		start_auction <- flip(0.005);
 		if start_auction{
+			write "auction started" color: #red;
 			do start_conversation 	to: list(Participant)
 		 						protocol: 'fipa-contract-net' 
 								performative: 'inform' 
@@ -156,7 +157,7 @@ species Initiator skills: [fipa] {
 	}
 	
 	
-	reflex send_cfp_to_participants when: (step = 1) {
+	reflex send_cfp_to_participants when: (step = 1) and (length(Participant at_distance 3)=nbOfParticipants) {
 		
 		write '(Time ' + time + '): ' + name + ' sends a cfp message to all participants:'+price;
 		do start_conversation to: list(Participant) protocol: 'fipa-contract-net' performative: 'cfp' contents: [price] ;
@@ -224,6 +225,11 @@ species Initiator skills: [fipa] {
 		}
 		price <- initialPrice;
 		start_auction <- false;
+		
+		ask Participant{
+			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
+			busy <- false;
+		}
 
 	}
 	
