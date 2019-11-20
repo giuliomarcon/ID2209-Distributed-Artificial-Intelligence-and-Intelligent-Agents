@@ -168,7 +168,12 @@ species ParticipantDutch parent: Participant{
 	// TODO fix
 	reflex auctionStarted when: length(informs) = 2 and step = 0{
 		busy <- true;
-		targetPoint <- Shop1;
+		
+		if(genre=0){
+			targetPoint <- Shop1;	
+		}else if(genre=1){
+			targetPoint <- Shop12;	
+		}
 		loop m over: informs {
 			if (m.contents[0]=informStartAcutionMSG_dutch and m.contents[1]=genre){
 				write name + ' Auction started ' + (string(m.contents)+ 'reserve:'+maxPrice);
@@ -232,7 +237,12 @@ species PartecipantSealedBid parent: Participant{
 	//reflex auctionStarted when: !empty(informs) and step = 0{
 	reflex auctionStarted when: length(informs)=2 and step = 0 {
 		busy <- true;
-		targetPoint <- Shop2;
+		if(genre=0){
+			targetPoint <- Shop2;	
+		}else if(genre=1){
+			targetPoint <- Shop22;	
+		}
+
 		startAuctionMSG <- informs[0];
 		startAuctionMSG <- informs[0];
 		
@@ -285,14 +295,25 @@ species PartecipantJapanese parent:Participant{
 	float lastProposedPrice;
 	float maxPrice;
 	
+	rgb guestColor;
+	
+	
+	
 	reflex startAuction when: !empty(informs) and step = 0{
-		busy <- true;
-		targetPoint <- Shop3;
+		
 		message startAuctionMSG <- informs[0];
 		lastProposedPrice<-0.0;
 	
 	
 		if (startAuctionMSG.contents[0]=informStartAcutionMSG_japanese and startAuctionMSG.contents[1]=genre){
+			busy <- true;
+			
+			if(genre=0){
+				targetPoint <- Shop3;	
+			}else if(genre=1){
+				targetPoint <- Shop32;	
+			}
+		
 			step<-1;
 			maxPrice<-rnd(avgMaxPrice-varianceMaxPrice,avgMaxPrice+varianceMaxPrice);
 			
@@ -309,6 +330,7 @@ species PartecipantJapanese parent:Participant{
 		
 		write '(Time ' + time + '): ' + name+'received proposed '+lastProposedPrice color:#blue;
 		if(lastProposedPrice<maxPrice){
+			write '(Time ' + time + '): ' +name + ": I'm staying in the auction" color:#blue;
 			do accept_proposal message: proposeM contents:[];
 		}else{
 			write '(Time ' + time + '): ' +name + ": I'm leaving the auction" color:#blue;
@@ -316,14 +338,25 @@ species PartecipantJapanese parent:Participant{
 			targetPoint <- Shop3;
 			do reject_proposal message: proposeM contents:[];
 		}
+		step<-2;
 	}
 	
 	
-	reflex finishAuction when: !empty(informs) and step = 1{
+	reflex finishAuction when: !empty(informs) and step = 2{
 		message finishAuctionMSG <- informs[0];
 		write '(Time ' + time + '): ' + name +': I won the action at price: '+lastProposedPrice;
 		do end_conversation message: finishAuctionMSG contents:[];
 		step<-0;
+	}
+	
+	aspect default{
+		if genre = 0{
+			guestColor <- #lightblue;
+		} else{
+			guestColor <- #blue;
+		}
+		draw pyramid(1) at: location color: guestColor;
+		draw sphere(0.5) at: location+{0,0,1} color: guestColor;
 	}
 }
 
@@ -460,7 +493,6 @@ species InitiatorDutch skills: [fipa] {
 	}
 }
 
-
 species InitiatorSealedBid skills:[fipa]{
 	bool start_auction <- false;
 	int step <- 0;
@@ -570,11 +602,13 @@ species InitiatorJapanese skills: [fipa]{
 	float increasingStep <- 10.0;
 	float price;
 	int genre;
+	int step <-0;
 	
 	bool start_auction <- false;
 	int totalBidder <- 0;
 	list<PartecipantJapanese> activeBidders;
 	list<PartecipantJapanese> silentBidders;
+	list<message> receivedACK<- [];
 	
 	reflex startAuction when: (start_auction = false and length(PartecipantJapanese) = totJapaneseBidders) {
 		start_auction <- flip(0.005);
@@ -583,8 +617,6 @@ species InitiatorJapanese skills: [fipa]{
 			write '(Time ' + time + '): ' + name +'Starting new Japanese Bid Auction! to('+length(PartecipantJapanese)+')'+PartecipantJapanese color:#blue;
 			write '(Time ' + time + '): ' + name +'reserve:'+reserve color:#blue;
 			
-			write list(PartecipantJapanese) color:#blue;
-
 			do start_conversation 	to: list(PartecipantJapanese)
 			 						protocol: 'fipa-contract-net' 
 									performative: 'inform' 
@@ -592,30 +624,36 @@ species InitiatorJapanese skills: [fipa]{
 				
 			price <- reserve;
 			step <- 1;
+		}else{
+			step <- 0;
 		}
 	
 	}
 	
 	reflex countBidders when: step =1 and !empty(informs) {
+		receivedACK<-[];
+		activeBidders<-[];
 		loop m over: informs {
 			add m.sender to:activeBidders;
+			add m to:receivedACK;
+			write '(Time ' + time + '): ' + name +'received ack from:'+m.sender color:#blue;
 		}
 		totalBidder <- length(activeBidders);
-		
+		step<-2;
 	}
 	
-	reflex updatePrice when:(step = 1) and (length(activeBidders at_distance 3)=totalBidder) and !empty(informs) and length(informs)=totalBidder {
-		
-		write '(Time ' + time + '): ' + name + ' sends a propose message to all participants:'+price;
-		price <- price;
-		loop m over: informs {
+	reflex updatePrice when:(step = 2) and (length(activeBidders at_distance 3)=totalBidder) {//and !empty(informs) and length(informs)=totalBidder {
+		write '(Time ' + time + '): ' + name + 'updatePrice price:'+price;
+		loop m over: receivedACK {
 			write '(Time ' + time + '): ' + name +' informing :'+m.sender+' the riserve price:'+reserve color:#blue;
 			do propose message: m contents: [price] ;
 		}
-		step <- 2;
+		step <- 3;
 	}
 	
-	reflex receiveRejection when: !empty(reject_proposals) and step=2{
+	reflex receiveRejection when: !empty(reject_proposals) and step=3{
+		write '(Time ' + time + '): ' + name + ' receiveRejection price;'+price;
+		
 		loop m over: reject_proposals {
 			totalBidder<-totalBidder-1;
 			remove m.sender from: activeBidders;
@@ -627,6 +665,7 @@ species InitiatorJapanese skills: [fipa]{
 	}
 	
 	reflex receivedAllAcceptance when: !empty(accept_proposals) and totalBidder>1 and (length(activeBidders)) = totalBidder{
+		write '(Time ' + time + '): ' + name + ' receivedAllAcceptance price;'+price;
 		price <- price + increasingStep;
 		loop m over: accept_proposals {
 			do propose message: m contents: [price] ;
@@ -634,11 +673,16 @@ species InitiatorJapanese skills: [fipa]{
 	}
 	
 	reflex finishedAuction when: ! empty(accept_proposals) and (length(silentBidders)+1) = totJapaneseBidders{
+		write '(Time ' + time + '): ' + name + ' finishedAuction price;'+price;
 		do inform message: accept_proposals[0] contents: [wonActionMSG];
 	}
 	
 	aspect default{
-		draw cube(3) at: location color: #blue;
+		if(genre =1){
+			draw cube(3) at: location color: #blue;	
+		}else{
+			draw cube(3) at: location color: #lightblue;	
+		}
 	}
 	
 }
