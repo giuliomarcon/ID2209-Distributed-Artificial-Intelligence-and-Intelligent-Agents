@@ -13,14 +13,18 @@ global {
 	point EntranceLocation <-{0,0};
 	point ExitLocation <-{100,100};
 	point Shop1 <- {20, 10};
+	point Shop12 <- {90, 20};
 	point Shop2 <- {30, 10};
+	point Shop22 <- {90, 30};
 	point Shop3 <- {40, 10};
+	point Shop32 <- {90, 40};
 
 	
 	string informStartAcutionMSG_dutch <- 'inform-start-of-auction-dutch';
 	string informStartAcutionMSG_FPSBA <- 'inform-start-of-auction-first-price-saled-bid';
 	string informStartAcutionMSG_japanese <- 'inform-start-of-auction-japanese';
 	
+	string dusthStartACK <- 'dutch-start-ack';
 	string japaneseStartACK <- 'japanese-start-ack';
 	
 	string informEndAcutionFailedMSG <- 'auction-failed';
@@ -38,6 +42,8 @@ global {
 	int totFPSBABidders <- 5;
 	int totJapaneseBidders <- 5;
 	
+	list<string> genres <- ['CD','T-Shirt'];
+	
 	// number of vist at each shop before quitting
 	int threshold <- 100;
 	
@@ -45,12 +51,29 @@ global {
 		
 		create InitiatorDutch number: 1{
 			location <- Shop1;
+			genre <- 0;
 		}
+		create InitiatorDutch number: 1{
+			location <- Shop12;
+			genre <- 1;
+		}
+		
 		create InitiatorSealedBid number: 1{
 			location <- Shop2;
+			genre <- 0;
 		}
+		create InitiatorSealedBid number: 1{
+			location <- Shop22;
+			genre <- 1;
+		}
+		
 		create InitiatorJapanese number: 1{
 			location <- Shop3;
+			genre <- 0;
+		}
+		create InitiatorJapanese number: 1{
+			location <- Shop32;
+			genre <- 1;
 		}
 		
 		create Entrance number: 1{
@@ -72,6 +95,7 @@ global {
 			write "created Dutch partecipant";
 			location <- EntranceLocation;
 			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
+			genre<-rnd(0,length(genres));
 		}
 		nbOfDutchParticipants <- nbOfDutchParticipants +1;
 	}
@@ -81,7 +105,7 @@ global {
 			write "created FPSBA partecipant";
 			location <- EntranceLocation;
 			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
-			
+			genre<-rnd(0,length(genres));
 		}
 		nOfFPSAPartecipants <- nOfFPSAPartecipants+1;
 	}
@@ -91,7 +115,7 @@ global {
 			write "created japanese partecipant";
 			location <- EntranceLocation;
 			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
-			
+			genre<-rnd(0,length(genres));	
 		}
 		nOfJapanesePartecipants <- nOfJapanesePartecipants+1;
 		
@@ -105,6 +129,7 @@ global {
 species Participant skills:[moving,fipa]{
 	point targetPoint <- nil;
 	bool busy <- false;
+	int genre;
 	
 	int step<-0;
 			
@@ -141,13 +166,16 @@ species ParticipantDutch parent: Participant{
 	int maxPrice <-rnd(750,950);
 	
 	// TODO fix
-	reflex auctionStarted when: !empty(informs) and step = 0{
+	reflex auctionStarted when: length(informs) = 2 and step = 0{
 		busy <- true;
 		targetPoint <- Shop1;
 		loop m over: informs {
-			if (m.contents=informStartAcutionMSG_dutch){
+			if (m.contents[0]=informStartAcutionMSG_dutch and m.contents[1]=genre){
 				write name + ' Auction started ' + (string(m.contents)+ 'reserve:'+maxPrice);
+				do inform message:m contents:[dusthStartACK];
 				step <-1;
+			}else{
+				do end_conversation message:m contents: [];
 			}
 		}
 	}
@@ -202,16 +230,19 @@ species PartecipantSealedBid parent: Participant{
 
 	
 	//reflex auctionStarted when: !empty(informs) and step = 0{
-	reflex auctionStarted when: !empty(informs) and step = 0 {
+	reflex auctionStarted when: length(informs)=2 and step = 0 {
 		busy <- true;
 		targetPoint <- Shop2;
+		startAuctionMSG <- informs[0];
 		startAuctionMSG <- informs[0];
 		
 	
 		write '(Time ' + time + '): ' +name + ': going to shop ';
 	
-		if (startAuctionMSG.contents[0]=informStartAcutionMSG_FPSBA){
+		if (startAuctionMSG.contents[0]=informStartAcutionMSG_FPSBA and startAuctionMSG.contents[1]=genre){
 			step<-1;
+		}else{
+			do end_conversation message:startAuctionMSG contents: [];
 		}
 	
 	}
@@ -261,12 +292,14 @@ species PartecipantJapanese parent:Participant{
 		lastProposedPrice<-0.0;
 	
 	
-		if (startAuctionMSG.contents[0]=informStartAcutionMSG_japanese){
+		if (startAuctionMSG.contents[0]=informStartAcutionMSG_japanese and startAuctionMSG.contents[1]=genre){
 			step<-1;
 			maxPrice<-rnd(avgMaxPrice-varianceMaxPrice,avgMaxPrice+varianceMaxPrice);
 			
 			write '(Time ' + time + '): ' +name + ': going to shop at max price'+maxPrice color:#blue;
 			do inform message: startAuctionMSG contents: [japaneseStartACK];
+		}else{
+			do end_conversation message:startAuctionMSG contents: [];
 		}
 	}
 	 
@@ -278,7 +311,7 @@ species PartecipantJapanese parent:Participant{
 		if(lastProposedPrice<maxPrice){
 			do accept_proposal message: proposeM contents:[];
 		}else{
-			write '(Time ' + time + '): ' +name + ': rejectd' color:#blue;
+			write '(Time ' + time + '): ' +name + ": I'm leaving the auction" color:#blue;
 			busy<-false;
 			targetPoint <- Shop3;
 			do reject_proposal message: proposeM contents:[];
@@ -295,13 +328,14 @@ species PartecipantJapanese parent:Participant{
 }
 
 species InitiatorDutch skills: [fipa] {
+	int genre;
 	float initialPrice <- 1000.0;
 	float price <- initialPrice;
 	float priceStep <-50.0;
 	float reserve <-500.0;
 	int step <-0;
-	int numberBidder <- 0;
-	
+	list<message> ack;
+	list<ParticipantDutch> bidders;
 	
 	bool start_auction <- false;
 	
@@ -314,19 +348,27 @@ species InitiatorDutch skills: [fipa] {
 			do start_conversation 	to: list(ParticipantDutch)
 		 						protocol: 'fipa-contract-net' 
 								performative: 'inform' 
-								contents: [ (informStartAcutionMSG_dutch)] ;
+								contents: [ informStartAcutionMSG_dutch,genre] ;
 			step <- 1;
 		}
 		
 		
 	}
 	
+	reflex receiveACK when: !empty(informs){
+		loop m over:informs{
+			add m to:ack;
+			add m.sender to: bidders;
+		}
+	}
 	
-	reflex send_cfp_to_participants when: (step = 1) and (length(ParticipantDutch at_distance 3)=nbOfDutchParticipants) {
-		
+	//reflex send_cfp_to_participants when: (step = 1) and (length(ParticipantDutch at_distance 3)=nbOfDutchParticipants) {
+	reflex send_cfp_to_participants when: (step = 1) and (length(bidders at_distance 3)=length(bidders)) {
 		write '(Time ' + time + '): ' + name + ' sends a cfp message to all participants:'+price;
-		do start_conversation to: list(ParticipantDutch) protocol: 'fipa-contract-net' performative: 'cfp' contents: [price] ;
-		numberBidder <- length(ParticipantDutch);
+		//do start_conversation to: list(ParticipantDutch) protocol: 'fipa-contract-net' performative: 'cfp' contents: [price] ;
+		loop m over:ack{
+			do inform message:m contents: [price] ;
+		}
 		step <- 2;
 	}
 	
@@ -337,10 +379,9 @@ species InitiatorDutch skills: [fipa] {
 	}
 	
 	reflex receive_refuse_messages when:  step=2 and  empty(accept_proposals ) and !empty(refuses ) 
-											and ( numberBidder = (length(refuses))){
+											and ( length(bidders) = (length(refuses))){
 		write '(Time ' + time + '): ' + name + ' receives refuse messages';
-		write 'numberBidder:'+numberBidder;
-		write 'length(refuses):'+length(refuses);
+		write 'number of refuses:'+length(refuses);
 		
 		if((price-priceStep) > reserve){
 			price <- price - priceStep;
@@ -366,8 +407,8 @@ species InitiatorDutch skills: [fipa] {
 		
 	}
 	
-	reflex receive_accept_messages when: !empty(accept_proposals ) and step=2 and (empty(refuses) and ((length(accept_proposals) = numberBidder))
-										or (numberBidder = (length(accept_proposals)+length(refuses)))) {
+	reflex receive_accept_messages when: !empty(accept_proposals ) and step=2 and (empty(refuses) and ((length(accept_proposals) = length(bidders)))
+										or (length(bidders) = (length(accept_proposals)+length(refuses)))) {
 		step <- 3;
 		
 		message firstAccept <- accept_proposals[0];
@@ -423,7 +464,7 @@ species InitiatorDutch skills: [fipa] {
 species InitiatorSealedBid skills:[fipa]{
 	bool start_auction <- false;
 	int step <- 0;
-	
+	int genre;
 	list<message> bids;
 	
 	int totalBidder <- 0;
@@ -459,7 +500,7 @@ species InitiatorSealedBid skills:[fipa]{
 			do start_conversation 	to: list(PartecipantSealedBid)
 			 						protocol: 'fipa-contract-net' 
 									performative: 'inform' 
-									contents: [ (informStartAcutionMSG_FPSBA)] ;
+									contents: [ informStartAcutionMSG_FPSBA,genre] ;
 				
 			
 			step <- 1;
@@ -528,6 +569,7 @@ species InitiatorJapanese skills: [fipa]{
 	float reserve <- 300.0;
 	float increasingStep <- 10.0;
 	float price;
+	int genre;
 	
 	bool start_auction <- false;
 	int totalBidder <- 0;
@@ -546,14 +588,20 @@ species InitiatorJapanese skills: [fipa]{
 			do start_conversation 	to: list(PartecipantJapanese)
 			 						protocol: 'fipa-contract-net' 
 									performative: 'inform' 
-									contents: [informStartAcutionMSG_japanese] ;
-			activeBidders <- copy(PartecipantJapanese);
-			totalBidder <- length(activeBidders);
-			
+									contents: [informStartAcutionMSG_japanese,genre] ;
+				
 			price <- reserve;
 			step <- 1;
 		}
 	
+	}
+	
+	reflex countBidders when: step =1 and !empty(informs) {
+		loop m over: informs {
+			add m.sender to:activeBidders;
+		}
+		totalBidder <- length(activeBidders);
+		
 	}
 	
 	reflex updatePrice when:(step = 1) and (length(activeBidders at_distance 3)=totalBidder) and !empty(informs) and length(informs)=totalBidder {
