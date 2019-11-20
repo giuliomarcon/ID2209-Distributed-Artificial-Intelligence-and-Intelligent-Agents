@@ -249,6 +249,7 @@ species PartecipantSealedBid parent: Participant{
 }
 
 species PartecipantJapanese parent:Participant{
+	rgb guestColor <- #blue;
 	float avgMaxPrice <- 800.0;
 	float varianceMaxPrice <- 75.0;
 	float lastProposedPrice;
@@ -276,21 +277,32 @@ species PartecipantJapanese parent:Participant{
 		
 		write '(Time ' + time + '): ' + name+'received proposed '+lastProposedPrice color:#blue;
 		if(lastProposedPrice<maxPrice){
+			write '(Time ' + time + '): ' +name + ': accepted' color:#blue;
 			do accept_proposal message: proposeM contents:[];
 		}else{
 			write '(Time ' + time + '): ' +name + ': rejectd' color:#blue;
 			busy<-false;
-			targetPoint <- Shop3;
+			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
 			do reject_proposal message: proposeM contents:[];
+			step<-0;
 		}
 	}
 	
 	
-	reflex finishAuction when: !empty(informs) and step = 1{
-		message finishAuctionMSG <- informs[0];
+	reflex finishAuction when: !empty(agrees) and step = 0{
+		message finishAuctionMSG <- agrees[0];
 		write '(Time ' + time + '): ' + name +': I won the action at price: '+lastProposedPrice;
 		do end_conversation message: finishAuctionMSG contents:[];
+		busy<-false;
+		targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
 		step<-0;
+
+		
+	}
+	
+	aspect default{
+		draw pyramid(1) at: location color: guestColor;
+		draw sphere(0.5) at: location+{0,0,1} color: guestColor;
 	}
 }
 
@@ -305,10 +317,9 @@ species InitiatorDutch skills: [fipa] {
 	
 	bool start_auction <- false;
 	
-	//TODO check all the partecipat are spawned
-	reflex startAuction when: nbOfDutchParticipants>0 and (start_auction = false) {
+	reflex startAuction when: nbOfDutchParticipants>0 and (start_auction = false) and (length(PartecipantSealedBid) = totFPSBABidders) {
 		
-		start_auction <- flip(0);
+		start_auction <- flip(0.005);
 		if start_auction{
 			write "dutch auction started" color: #red;
 			do start_conversation 	to: list(ParticipantDutch)
@@ -440,7 +451,7 @@ species InitiatorSealedBid skills:[fipa]{
 //	}
 //	
 	reflex startAuction when: (start_auction = false and length(PartecipantSealedBid) = totFPSBABidders) {
-		start_auction <- flip(0);
+		start_auction <- flip(0.005);
 		
 		if start_auction{
 			write '(Time ' + time + '): ' + name +'Starting new Saled Bid Auction! to('+length(PartecipantSealedBid)+')'+PartecipantSealedBid color:#yellow;
@@ -526,8 +537,9 @@ species InitiatorSealedBid skills:[fipa]{
 
 species InitiatorJapanese skills: [fipa]{
 	float reserve <- 300.0;
-	float increasingStep <- 10.0;
+	float increasingStep <- 100.0;
 	float price;
+	int step <- 0;
 	
 	bool start_auction <- false;
 	int totalBidder <- 0;
@@ -572,22 +584,35 @@ species InitiatorJapanese skills: [fipa]{
 			totalBidder<-totalBidder-1;
 			remove m.sender from: activeBidders;
 			add m.sender to: silentBidders;
-			do end_conversation message: m contents: [] ;
+			
+			if(length(activeBidders)>=1){
+				do end_conversation message: m contents: [] ;
+			}else{
+				write "sono entrato in una svedese" color:#red;
+				do agree message: m contents: [wonActionMSG];
+				start_auction <- false;
+				step<-0;
+			}
 			//make bidder free to go dance
 		}
 		
 	}
 	
-	reflex receivedAllAcceptance when: !empty(accept_proposals) and totalBidder>1 and (length(activeBidders)) = totalBidder{
+	reflex receivedAllAcceptance when: !empty(accept_proposals) and totalBidder>=1 and (length(activeBidders)) = totalBidder{
 		price <- price + increasingStep;
 		loop m over: accept_proposals {
 			do propose message: m contents: [price] ;
 		}
 	}
 	
-	reflex finishedAuction when: ! empty(accept_proposals) and (length(silentBidders)+1) = totJapaneseBidders{
+	reflex finishedAuction when: !empty(accept_proposals) and (length(silentBidders)+1) = totJapaneseBidders{
 		do inform message: accept_proposals[0] contents: [wonActionMSG];
+		start_auction <- false;
+		step<-0;
 	}
+	
+	
+	
 	
 	aspect default{
 		draw cube(3) at: location color: #blue;
