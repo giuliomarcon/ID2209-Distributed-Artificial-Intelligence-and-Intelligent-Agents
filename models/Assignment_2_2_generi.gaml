@@ -21,6 +21,7 @@ global {
 	string informStartAcutionMSG_FPSBA <- 'inform-start-of-auction-first-price-saled-bid';
 	string informStartAcutionMSG_japanese <- 'inform-start-of-auction-japanese';
 	
+	string dusthStartACK <- 'dutch-start-ack';
 	string japaneseStartACK <- 'japanese-start-ack';
 	
 	string informEndAcutionFailedMSG <- 'auction-failed';
@@ -37,6 +38,12 @@ global {
 	int totDutchBidders <- 5;
 	int totFPSBABidders <- 5;
 	int totJapaneseBidders <- 5;
+	
+	float dutchProbability <-0.005;
+	float FPSAProbability <-0.00;
+	float japaneseProbability <-0.00;	
+	
+	list<string> genres <- ['CD','T-Shirt'];
 	
 	// number of vist at each shop before quitting
 	int threshold <- 100;
@@ -69,9 +76,10 @@ global {
 
 	reflex spawnDutchPartecipant when: nbOfDutchParticipants<totDutchBidders{
 		create ParticipantDutch number: 1{
-			write "created Dutch partecipant";
 			location <- EntranceLocation;
 			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
+			genre<-rnd(0,length(genres)-1);
+			write name+"created Dutch partecipant of genre: "+genre;
 		}
 		nbOfDutchParticipants <- nbOfDutchParticipants +1;
 	}
@@ -81,7 +89,7 @@ global {
 			write "created FPSBA partecipant";
 			location <- EntranceLocation;
 			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
-			
+			genre<-rnd(0,length(genres)-1);
 		}
 		nOfFPSAPartecipants <- nOfFPSAPartecipants+1;
 	}
@@ -91,7 +99,7 @@ global {
 			write "created japanese partecipant";
 			location <- EntranceLocation;
 			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
-			
+			genre<-rnd(0,length(genres)-1);
 		}
 		nOfJapanesePartecipants <- nOfJapanesePartecipants+1;
 		
@@ -105,6 +113,7 @@ global {
 species Participant skills:[moving,fipa]{
 	point targetPoint <- nil;
 	bool busy <- false;
+	int genre;
 	
 	int step<-0;
 			
@@ -138,17 +147,24 @@ species Participant skills:[moving,fipa]{
 
 species ParticipantDutch parent: Participant{
 	rgb guestColor <- #green;
-	int maxPrice <-rnd(750,950);
+	int maxPrice;
+	float lastprice;
 	
-	// TODO fix
 	reflex auctionStarted when: !empty(informs) and step = 0{
-		busy <- true;
-		targetPoint <- Shop1;
+
 		loop m over: informs {
-			if (m.contents=informStartAcutionMSG_dutch){
+			if (m.contents[0]=informStartAcutionMSG_dutch) and (m.contents[1]=genre){
+				maxPrice <-rnd(750,950);
 				write name + ' Auction started ' + (string(m.contents)+ 'reserve:'+maxPrice);
+				do inform message:m contents:[dusthStartACK];
+				busy <- true;
+				targetPoint <- Shop1;
+				lastprice<-0;
 				step <-1;
 			}
+//			else{
+//				do end_conversation message:m contents: [];
+//			}
 		}
 	}
 	
@@ -161,12 +177,27 @@ species ParticipantDutch parent: Participant{
 			write('(Time ' + time + '): ' + name+': price to hig, do refuse (reserve:'+maxPrice+')');
 			do refuse message: proposalFromInitiator contents: [refusedProposal] ;	
 		}else{
+			lastprice<-proposedPrice;
 			write('(Time ' + time + '): ' + name+': price good, do accept (reserve:'+maxPrice+')');
 			do accept_proposal message: proposalFromInitiator contents: [acceptProposal] ;	
 		}
 		
 	}
 	
+	reflex won when:!empty(agrees){
+		write('(Time ' + time + '): ' + name+': I won at:'+lastprice);
+		targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
+		busy <- false;
+		step<-0;
+		do end_conversation message: agrees[0] contents: [ (informEndAcutionFailedMSG) ] ;
+	}
+	reflex lost when:!empty(refuses){
+		write('(Time ' + time + '): ' + name+': I have lost');
+		targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
+		busy <- false;
+		step <- 0;
+		do end_conversation message: refuses[0] contents: [ (informEndAcutionFailedMSG) ] ;
+	}
 	
 	aspect default{
 		draw pyramid(1) at: location color: guestColor;
@@ -312,32 +343,49 @@ species InitiatorDutch skills: [fipa] {
 	float priceStep <-50.0;
 	float reserve <-500.0;
 	int step <-0;
-	int numberBidder <- 0;
+	//int numberBidder <- 0;
+	int genre;
 	
+	list<message> ack;
+	list<ParticipantDutch> bidders;
 	
 	bool start_auction <- false;
 	
 	reflex startAuction when: nbOfDutchParticipants>0 and (start_auction = false) and (length(PartecipantSealedBid) = totFPSBABidders) {
 		
-		start_auction <- flip(0.005);
+		start_auction <- flip(dutchProbability);
 		if start_auction{
-			write "dutch auction started" color: #red;
+			genre <- flip(0.5) ? 0 : 1;
+			write "dutch auction started with genre: "+genre color: #red;
 			do start_conversation 	to: list(ParticipantDutch)
 		 						protocol: 'fipa-contract-net' 
 								performative: 'inform' 
-								contents: [ (informStartAcutionMSG_dutch)] ;
-			step <- 1;
+								contents: [ informStartAcutionMSG_dutch, genre] ;
+			
 		}
 		
 		
 	}
 	
+	reflex receiveACK when: !empty(informs) and step=0{
+		loop m over:informs{
+			add m to:ack;
+			add m.sender to: bidders;
+		}
+		write '(Time ' + time + '): ' + name + ' ack received '+ack color: #gold;
+		step <- 1;
+	}
 	
-	reflex send_cfp_to_participants when: (step = 1) and (length(ParticipantDutch at_distance 3)=nbOfDutchParticipants) {
-		
+	//reflex send_cfp_to_participants when: (step = 1) and (length(ParticipantDutch at_distance 3)=nbOfDutchParticipants) {
+	reflex send_cfp_to_participants when: (step = 1) and (length(bidders at_distance 3)=length(bidders)) {
 		write '(Time ' + time + '): ' + name + ' sends a cfp message to all participants:'+price;
-		do start_conversation to: list(ParticipantDutch) protocol: 'fipa-contract-net' performative: 'cfp' contents: [price] ;
-		numberBidder <- length(ParticipantDutch);
+		//do start_conversation to: list(ParticipantDutch) protocol: 'fipa-contract-net' performative: 'cfp' contents: [price] ;
+		
+		
+		loop m over:ack{
+			do cfp message:m contents: [price] ;
+			write '(Time ' + time + '): ' + name + ' sent inform to '+m.sender+ ' price:'+price color: #orange;
+		}
 		step <- 2;
 	}
 	
@@ -348,9 +396,8 @@ species InitiatorDutch skills: [fipa] {
 	}
 	
 	reflex receive_refuse_messages when:  step=2 and  empty(accept_proposals ) and !empty(refuses ) 
-											and ( numberBidder = (length(refuses))){
+											and ( length(bidders) = (length(refuses))){
 		write '(Time ' + time + '): ' + name + ' receives refuse messages';
-		write 'numberBidder:'+numberBidder;
 		write 'length(refuses):'+length(refuses);
 		
 		if((price-priceStep) > reserve){
@@ -377,35 +424,35 @@ species InitiatorDutch skills: [fipa] {
 		
 	}
 	
-	reflex receive_accept_messages when: !empty(accept_proposals ) and step=2 and (empty(refuses) and ((length(accept_proposals) = numberBidder))
-										or (numberBidder = (length(accept_proposals)+length(refuses)))) {
+	reflex receive_accept_messages when: !empty(accept_proposals ) and step=2 and (empty(refuses) and ((length(accept_proposals) = length(bidders)))
+										or (length(bidders) = (length(accept_proposals)+length(refuses)))) {
 		step <- 3;
 		
 		message firstAccept <- accept_proposals[0];
 		
 		write '(Time ' + time + '): ' + name + ' receives accepted messages, send end of conversation, winner is'+agent(firstAccept.sender).name ;
 		// the first who accept win the auction
-		do end_conversation message: firstAccept contents: [ (wonActionMSG)] ;
+		do agree message: firstAccept contents: [ (wonActionMSG)] ;
 		
 		//the others lose
 		loop while: !empty(accept_proposals) {
 			message otheAccepts <- accept_proposals[0];
 			
 			write '(Time ' + time + '): ' + name + ' end of conversation '+agent(otheAccepts.sender).name+' you lost' ;
-	    	do end_conversation message: otheAccepts contents:  [lostActionMSG] ;
+	    	do refuse message: otheAccepts contents:  [lostActionMSG] ;
 		}
 		loop while: !empty(refuses) {
 			message refusesMSG <- refuses[0];
 			write '(Time ' + time + '): ' + name + ' end of conversation '+agent(refusesMSG.sender).name+' you lost' ;
-	    	do end_conversation message: refusesMSG contents:  [lostActionMSG] ;
+	    	do refuse message: refusesMSG contents:  [lostActionMSG] ;
 		}
+		
+		
 		price <- initialPrice;
 		start_auction <- false;
-		
-		ask ParticipantDutch{
-			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
-			busy <- false;
-		}
+		step<-0;
+		ack<-[];
+		bidders<-[];
 
 	}
 	
@@ -451,7 +498,7 @@ species InitiatorSealedBid skills:[fipa]{
 //	}
 //	
 	reflex startAuction when: (start_auction = false and length(PartecipantSealedBid) = totFPSBABidders) {
-		start_auction <- flip(0.005);
+		start_auction <- flip(FPSAProbability);
 		
 		if start_auction{
 			write '(Time ' + time + '): ' + name +'Starting new Saled Bid Auction! to('+length(PartecipantSealedBid)+')'+PartecipantSealedBid color:#yellow;
@@ -547,7 +594,7 @@ species InitiatorJapanese skills: [fipa]{
 	list<PartecipantJapanese> silentBidders;
 	
 	reflex startAuction when: (start_auction = false and length(PartecipantJapanese) = totJapaneseBidders) {
-		start_auction <- flip(0.005);
+		start_auction <- flip(japaneseProbability);
 		
 		if start_auction{
 			write '(Time ' + time + '): ' + name +'Starting new Japanese Bid Auction! to('+length(PartecipantJapanese)+')'+PartecipantJapanese color:#blue;
