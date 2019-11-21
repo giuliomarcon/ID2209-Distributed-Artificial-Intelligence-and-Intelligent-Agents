@@ -55,7 +55,7 @@ global {
 			initialPrice<-1000.0;
 			priceStep <-50.0;
 			reserve<-500.0;
-			invresingFactor<-50.0;
+			increasingFactor<-50.0;
 		}
 		create InitiatorSealedBid number: 1{
 			location <- Shop2;
@@ -102,7 +102,7 @@ global {
 	}
 	
 	reflex spawnJapanaesePArtecipant when: nOfJapanesePartecipants<totJapaneseBidders{
-		create PartecipantJapanese number: 1{
+		create ParticipantJapanese number: 1{
 			location <- EntranceLocation;
 			targetPoint<-EnormousLocation+{rnd(-5,5),rnd(5,-5)};
 			genre<-rnd(0,length(genres)-1);
@@ -248,7 +248,7 @@ species PartecipantSealedBid parent: Participant{
 	
 }
 
-species PartecipantJapanese parent:Participant{
+species ParticipantJapanese parent:Participant{
 	rgb guestColor <- #blue;
 	float avgMaxPrice <- 800.0;
 	float varianceMaxPrice <- 75.0;
@@ -315,7 +315,7 @@ species InitiatorDutch skills: [fipa] {
 	//int numberBidder <- 0;
 	int genre;
 	int qtySold <-0;
-	float invresingFactor<-50.0;
+	float increasingFactor<-50.0;
 	
 	list<message> ack;
 	list<ParticipantDutch> bidders;
@@ -327,7 +327,7 @@ species InitiatorDutch skills: [fipa] {
 		start_auction <- flip(dutchProbability);
 		if start_auction{
 		 	price <- initialPrice;
-			reserve<-reserve+qtySold*invresingFactor;
+			reserve<-reserve+qtySold*increasingFactor;
 			genre <- flip(0.5) ? 0 : 1;
 			write "dutch auction started with genre: "+genre color: #red;
 			do start_conversation 	to: list(ParticipantDutch)
@@ -532,22 +532,22 @@ species InitiatorJapanese skills: [fipa]{
 	
 	bool start_auction <- false;
 	int totalBidder <- 0;
-	list<PartecipantJapanese> activeBidders;
-	list<PartecipantJapanese> silentBidders;
+	list<ParticipantJapanese> activeBidders;
+	list<ParticipantJapanese> silentBidders;
 	
-	reflex startAuction when: (start_auction = false and length(PartecipantJapanese) = totJapaneseBidders) {
+	reflex startAuction when: (start_auction = false and length(ParticipantJapanese) = totJapaneseBidders) {
 		start_auction <- flip(japaneseProbability);
 		
 		if start_auction{
 			write '(Time ' + time + '): ' + name +'japanese:Starting new Japanese Bid Auction!';
 			
-			write list(PartecipantJapanese) color:#blue;
+			write list(ParticipantJapanese) color:#blue;
 
-			do start_conversation 	to: list(PartecipantJapanese)
+			do start_conversation 	to: list(ParticipantJapanese)
 			 						protocol: 'fipa-contract-net' 
 									performative: 'inform' 
 									contents: [informStartAcutionMSG_japanese] ;
-			activeBidders <- copy(PartecipantJapanese);
+			activeBidders <- copy(ParticipantJapanese);
 			totalBidder <- length(activeBidders);
 			
 			price <- reserve;
@@ -641,7 +641,7 @@ experiment Festival type: gui {
 		display map type: opengl {
 			species ParticipantDutch;
 			species PartecipantSealedBid;
-			species PartecipantJapanese;
+			species ParticipantJapanese;
 			species InitiatorDutch;
 			species InitiatorSealedBid;
 			species InitiatorJapanese;
