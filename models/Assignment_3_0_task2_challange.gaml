@@ -75,7 +75,7 @@ species Stage skills:[fipa]{
 		dressCode<-flip(0.5);
 		smoke<-flip(0.5);
 		//advertise new act
-		
+//		write "****************************";
 		do start_conversation to: list(Guest) protocol: 'fipa-contract-net' performative: 'inform' contents: [stageIndex,light,speakers,band,aesthetic,dressCode,smoke] ;
 	}
 	
@@ -326,6 +326,9 @@ species Leader skills:[fipa]{
 			guestCounter[originalStage]<-guestCounter[originalStage]-1;
 			guestCounter[desiredStage]<-guestCounter[desiredStage]+1;
 			guestUtility<-copy(guestUtilityTmp);
+			globalUtility<-newGlobalUtility;
+//			write globalUtility;
+			
 			do accept_proposal message: m contents:[desiredStage];
 		}else{
 			write ""+m.sender+" stay in place at "+originalStage color:#orange;
