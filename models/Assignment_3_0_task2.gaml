@@ -4,7 +4,6 @@
 * Description: 
 * Tags: Tag1, Tag2, TagN
 ***/
-
 model Assignment30task2
 
 /* Insert your model definition here */
@@ -16,6 +15,62 @@ global {
 	
 	float minL <-0.0;
 	float maxL <-1.0;
+	
+	action stage0_action
+	{
+		Stage s<-list(Stage)[0];
+		write "STAGE 0";
+		write"light:"+s.light;
+		write"speakers:"+s.speakers;
+		write"band:"+s.band;
+		write"aesthetic"+s.aesthetic;
+		write"dressCode::"+s.dressCode;
+		write"smoke:"+s.smoke;
+		write"song:"+"";
+	}	
+	
+	action stage1_action
+	{
+		Stage s<-list(Stage)[1];
+		write "STAGE 1";
+		write"light:"+s.light;
+		write"speakers:"+s.speakers;
+		write"band:"+s.band;
+		write"aesthetic"+s.aesthetic;
+		write"dressCode::"+s.dressCode;
+		write"smoke:"+s.smoke;
+		write"song:"+"";
+	}	
+	
+	action stage2_action
+	{
+		Stage s<-list(Stage)[2];
+		write "STAGE 2";
+		write"light:"+s.light;
+		write"speakers:"+s.speakers;
+		write"band:"+s.band;
+		write"aesthetic"+s.aesthetic;
+		write"dressCode::"+s.dressCode;
+		write"smoke:"+s.smoke;
+		write"song:"+"";
+	}	
+	
+	action stage3_action
+	{
+		Stage s<-list(Stage)[3];
+		write "STAGE 3";
+		write"light:"+s.light;
+		write"speakers:"+s.speakers;
+		write"band:"+s.band;
+		write"aesthetic"+s.aesthetic;
+		write"dressCode::"+s.dressCode;
+		write"smoke:"+s.smoke;
+		write"song:"+"";
+	}
+	action stage9_action
+	{
+		write "stage3_action";
+	}
 	
 	init{
 		create Stage number: 1 {
@@ -207,6 +262,12 @@ experiment Festival type: gui {
 		display map type: opengl {
 			species Stage;
 			species Guest;
+			event 'a' action:stage0_action;
+			event 'b' action:stage1_action;
+			event 'c' action:stage2_action;
+			event 'd' action:stage3_action;
+			//Stop music
+			event '9' action:stage9_action;
 		}
 	}
 }
