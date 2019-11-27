@@ -11,7 +11,7 @@ model Festival
 
 global{
 	//int N <- rnd(4,20);
-	int N<-8; 
+	int N<-20; 
     init{
         create Queen number: N{
         	//TODO ci ho messo [rnd(0,N-1),rnd(0,N-1)] prima era [rnd(0,N),0]
@@ -61,9 +61,9 @@ species Queen skills:[fipa]{
 			}
 			//location <- ChessBoard[availablePositions.x].location;	
 			
-			write name+" AVList: "+availablePositions color:#pink;
-			write name+" location values: "+availablePositions[0] color:#pink;
-			write name+" location: "+location color:#pink;
+//			write name+" AVList: "+availablePositions color:#pink;
+//			write name+" location values: "+availablePositions[0] color:#pink;
+//			write name+" location: "+location color:#pink;
 			
 //			loop i from: 0 to: N-1 {
 //			     loop j from: 0 to: N-1{
@@ -73,7 +73,7 @@ species Queen skills:[fipa]{
 //			     } 
 //			}
 			positionSuccessor<- getPS(availablePositions);
-			write name+" positionSuccessor: "+positionSuccessor color:#pink;
+//			write name+" positionSuccessor: "+positionSuccessor color:#pink;
 			AvPositionIndex<-0;
 			status<-2;
 		}
@@ -187,7 +187,7 @@ species Queen skills:[fipa]{
     	int loc_y <- availablePositions[AvPositionIndex].y;
     	location <-ChessBoard[loc_x,loc_y].location;
     	
-		write self.name+"  - x:"+loc_x+" y:"+loc_y color:#pink;
+//		write self.name+"  - x:"+loc_x+" y:"+loc_y color:#pink;
     }
     
 //    reflex logPositions {
