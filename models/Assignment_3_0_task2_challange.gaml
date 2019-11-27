@@ -10,8 +10,9 @@ model Assignment30task2
 /* Insert your model definition here */
 
 global {
-	int durationAct <- 100;
-	int timeCounter<-0;
+	int durationAct <- 500;
+	int timeCounter<--10;
+	//int totalGuests<-10;
 	int totalGuests<-10;
 	list<point> stageLocations <- [{10,10},{90,10},{90,90},{10,90}];
 	
@@ -41,6 +42,7 @@ global {
 		create Guest number: totalGuests {
 			location <- {rnd(50-10,50+10),rnd(50-10,50+10)};
 		}
+		create Leader;
 		
 	}
 	
@@ -93,10 +95,13 @@ species Guest skills:[fipa, moving]{
 	float speakers;
 	float band;
 	float aesthetic;
-	float crowdMass;
+	bool crowdMass;
 	bool dressCode;
 	int stageIndex;
 	bool smoke;
+	
+	int status;
+	list<float> utilities<-[0,0,0,0];
 	
 	float pref0;
 	float pref1;
@@ -115,8 +120,8 @@ species Guest skills:[fipa, moving]{
 		aesthetic<-rnd(minL, maxL);
 		dressCode<-flip(0.5);
 		smoke<-flip(0.5);
-		
-		crowdMass<-rnd(minL, maxL);
+		//false whant to be alone, true whant to be in crowded areas
+		crowdMass<-flip(0.5);
 		
 		pref0<- -1.0;
 		pref1<- -1.0;
@@ -124,12 +129,15 @@ species Guest skills:[fipa, moving]{
 		pref3<- -1.0;
 		preferredStage <- -1;
 		walking<-false;
+		
+		status<-0;
 	}
 	
-	reflex receivedNewAct when:!empty(informs){
+	reflex receivedNewAct when:!empty(informs) and !(string(informs[0].sender) contains "Lead"){
 		message m <- informs[0];
 		
-		write name+ " received inform message!";
+		write name+ " received inform message from:"+m.sender;
+		write "status:"+status;
 		
 		float pValue <-  float(m.contents[1])*light+ float(m.contents[2])*speakers+float(m.contents[3])*band+float(m.contents[4])*aesthetic;
 		
@@ -152,12 +160,12 @@ species Guest skills:[fipa, moving]{
 		}
 		
 		
-		
+		status<-1;
 		
 		
 	}
 	
-	reflex gotAllPref when:(pref0>0 and pref1>0 and pref2>0 and pref3>0){
+	reflex gotAllPref when:(pref0>0 and pref1>0 and pref2>0 and pref3>0) and status =1{
 		list<Leader> leaders <- list(Leader);
 		write name+" pref0:"+pref0 color:#red;
 		write name+" pref1:"+pref1 color:#red;
@@ -175,6 +183,11 @@ species Guest skills:[fipa, moving]{
 		}else if(selectedValue=pref3){
 			preferredStage<-3;
 		}
+		
+		utilities[0]<-pref0;
+		utilities[1]<-pref1;
+		utilities[2]<-pref2;
+		utilities[3]<-pref3;
 		pref0<- -1.0;
 		pref1<- -1.0;
 		pref2<- -1.0;
@@ -186,16 +199,59 @@ species Guest skills:[fipa, moving]{
 		targetPoint<-stageLocations[preferredStage];
 		
 		 
-		do start_conversation to: list(leaders[0]) protocol: 'fipa-contract-net' performative: 'inform' contents: [selectedValue] ;
+		do start_conversation to: list(leaders[0]) protocol: 'fipa-contract-net' performative: 'inform' contents: [selectedValue,preferredStage] ;
+		write ""+name+" preferredStage:"+preferredStage;
+		status<-2;
+	}
+
+	reflex askHowCrowded when:status = 4 and !walking{
+		list<Leader> leaders <- list(Leader);
+		do start_conversation to: list(leaders[0]) protocol: 'fipa-contract-net' performative: 'query' contents: [''] ;
+		status<-5;
+	}
+	
+	reflex decideIfMove when:status = 5 and !empty(informs) and !walking{
+		message m<-informs[0];
+		list<int> guestCounter<-m.contents;
+		int desiredStage;
+		list<Leader> leaders <- list(Leader);
+		
+		write "got accupancylist:"+guestCounter color:#green;
+		write "we are:"+guestCounter[preferredStage]+ " at "+preferredStage color:#green;
+		
+		// want to be alone
+		if(crowdMass=false and guestCounter[preferredStage]>1 and min(guestCounter)<guestCounter[preferredStage]){
+			desiredStage<-index_of(guestCounter,min(guestCounter));
+			write "I want to be alore,want to go to"+index_of(guestCounter,min(guestCounter)) color:#orange;
+		}//else if (  max(guestCounter)>guestCounter[preferredStage]){
+		else{
+			desiredStage<-index_of(guestCounter,max(guestCounter));
+			write "I DO NOT want to be alore,want to go to"+index_of(guestCounter,max(guestCounter)) color:#orange;
+		}
+		
+		do start_conversation to: list(leaders[0]) protocol: 'fipa-contract-net' performative: 'propose' contents: [desiredStage,utilities[desiredStage],preferredStage] ;
+		status<-5;
+	}
+	
+	reflex gotResponse when:!empty(accept_proposals) and !walking{
+		message m<-accept_proposals[0];
+		int newStage<-int(m.contents[0]);
+		preferredStage<-newStage;
+		targetPoint<-stageLocations[preferredStage];
+		walking<-true;		
+		do end_conversation message: m contents: [ ('') ] ;
+		
 	}
 
 	reflex moveToTarget when: targetPoint != nil {
 		do goto target:targetPoint;
+		status<-3;
 	}
 	
 	reflex arrivedStage when: targetPoint!= nil and location distance_to(targetPoint) < 1{
 		walking<-false;
 		targetPoint<-nil;
+		status<-4;
 	}
 	
 	reflex dance when: walking=false{
@@ -203,8 +259,18 @@ species Guest skills:[fipa, moving]{
 	}
 	
     aspect default{
-       	draw cone3D(1.3,2.3) at: location color: #slategray ;
-    	draw sphere(0.7) at: location + {0, 0, 2} color: #salmon ;
+       	//draw cone3D(1.3,2.3) at: location color: #slategray ;
+    	//draw sphere(0.7) at: location + {0, 0, 2} color: #salmon ;
+    	
+    	if(crowdMass){
+			// 	want to be with people
+	       	draw cone3D(1.3,2.3) at: location color: #red ;
+	    	draw sphere(0.7) at: location + {0, 0, 2} color: #red ;
+    	}else{
+			// want to be alone
+	       	draw cone3D(1.3,2.3) at: location color: #blue ;
+	    	draw sphere(0.7) at: location + {0, 0, 2} color: #blue ;
+    	}
     }
     
 }
@@ -215,21 +281,59 @@ species Leader skills:[fipa]{
 	float globalUtility<-0;
 	//TODO quando lo resetti?
 	list<int> guestCounter<-[0,0,0,0];
+	list<float> guestUtility<-[0,0,0,0];
 	
 	reflex receivedPreference when:length(informs)>0 and msgReceivedCount<totalGuests{
 		loop m over: informs{
 			msgReceivedCount<-msgReceivedCount+1;
-			globalUtility<-globalUtility+float(m.contents[0]);
+			guestUtility[int(m.contents[1])]<-float(m.contents[0]);
+			int stageIndex<-int(m.contents[1]);
+			guestCounter[stageIndex]<-guestCounter[stageIndex]+1;
 			
 		}
 		
 	}
 	
 	reflex allMsgReceived when: msgReceivedCount=totalGuests{
+		globalUtility<-sum(guestUtility);
 		write "got max global utility:"+globalUtility color:#red;
 		msgReceivedCount<-0;
-		globalUtility<-0;
+		//globalUtility<-0;
 	}
+	
+	reflex replyHowCrowded when:!empty(queries){
+		message m <- queries[0];
+		write ""+name+"providing guestCounter:"+guestCounter color:#pink;
+		do inform message:m contents:guestCounter;
+	}
+	
+	reflex replyProposeChange when:!empty(proposes){
+		message m <- proposes[0];
+		int originalStage <- m.contents[2];
+		int desiredStage <- m.contents[0];
+		float newUtil<-m.contents[1];
+		list<float> guestUtilityTmp<- copy(guestUtility);
+		
+		guestUtilityTmp[desiredStage]<-newUtil;
+		
+		float newGlobalUtility<-sum(guestUtilityTmp);
+		
+		write "globalUtility:"+globalUtility color:#red;
+		write  "newGlobalUtility:"+newGlobalUtility color:#red;
+		
+		if(newGlobalUtility>=globalUtility){
+			write "tell "+m.sender+" to move to "+desiredStage color:#orange;
+			guestCounter[originalStage]<-guestCounter[originalStage]-1;
+			guestCounter[desiredStage]<-guestCounter[desiredStage]+1;
+			guestUtility<-copy(guestUtilityTmp);
+			do accept_proposal message: m contents:[desiredStage];
+		}else{
+			write ""+m.sender+" stay in place at "+originalStage color:#orange;
+			do accept_proposal message: m contents:[originalStage];
+		}
+	
+	}
+	
 }
 
 
@@ -239,6 +343,7 @@ experiment Festival type: gui {
 		display map type: opengl {
 			species Stage;
 			species Guest;
+			species Leader;
 		}
 	}
 }
