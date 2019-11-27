@@ -11,7 +11,7 @@ model Festival
 
 global{
 	//int N <- rnd(4,20);
-	int N<-20; 
+	int N<-4; 
     init{
         create Queen number: N{
         	//TODO ci ho messo [rnd(0,N-1),rnd(0,N-1)] prima era [rnd(0,N),0]
