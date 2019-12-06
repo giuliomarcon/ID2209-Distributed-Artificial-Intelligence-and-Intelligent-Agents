@@ -11,10 +11,10 @@ model finalProject0
 global {
 	int doorSize<-6;
 	
-	point StageLocation <- {85,85};
 	point EntranceLocation <-{doorSize/2,doorSize/2};
 	point ExitLocation <-{100-doorSize/2,doorSize/2};
 	
+	point StageLocation <- {85,85};
 	point ChillLocation <- {15,85};
 	point BarLocation <- {50,50};
 	point securityLocation <- {3,50};
@@ -56,10 +56,9 @@ global {
 species Guest  skills:[moving,fipa]{
 	rgb guestColor <- #red;	
 	point targetPoint <- nil;
-	bool busy <- false;
 	
 	// Treats
-	float drankness <- 0.0;
+	float drunkness <- 0.0;
 	float talkative <- 0.0;
 	float thirsty <- 0.0;
 	float chill2dance <- 0.0;
@@ -67,27 +66,47 @@ species Guest  skills:[moving,fipa]{
 	float danceTrashold <- 0.5;
 	float thirstyTrashold <- 1.0;
 
+	int status<-3;
+	/*
+	 * 0: want to drink
+	 * 1: asked menu
+	 * 2: received menu, ask for a drink
+	 * 3: drinked, redy to go chill\dance;
+	 * 4: wandering
+	 */
 	
 	reflex moveToTarget when: targetPoint != nil {
 		do goto target:targetPoint;
 	}
 	
-	reflex updateThirsty when:thirsty<thirstyTrashold {
+	reflex updateThirsty when:thirsty<thirstyTrashold and status = 4 {
 		//if (flip (0.1) = true){
 		if(true){
-			thirsty <- thirsty + rnd(0.0, 0.01);
+			//thirsty <- thirsty + rnd(0.0, 0.01);
+			thirsty <- thirsty + 0.3;
 			//write name+ "thirsty:"+thirsty;
 		}
 	}
 	
-	reflex askMenuBar when:thirsty>=thirstyTrashold and location distance_to(BarLocation) < 0.5{
-		do start_conversation to: list(Bar) protocol: 'fipa-contract-net' performative: 'cfp' contents: ['1'] ;
+//	reflex introduceToBartender when:thirsty>=thirstyTrashold and location distance_to(BarLocation) < 0.5{
+//		do start_conversation to: list(Bar) protocol: 'fipa-contract-net' performative: 'inform' contents: [drunkness] ;
+//		thirsty<-0.0;
+//		write name+ "ask the menu:"+thirsty color:#blue;
+//	}
+
+	reflex logTreats{
+		write "drunkness:"+drunkness +" thirsty:"+thirsty+ " status:"+status;
+	}
+	
+	reflex askMenuBar when:status = 0 and thirsty>=thirstyTrashold and location distance_to(BarLocation) < 5{
+		do start_conversation to: list(Bar) protocol: 'fipa-contract-net' performative: 'cfp' contents: [drunkness] ;
 		
 		thirsty<-0.0;
+		status <- 1;
 		write name+ "ask the menu:"+thirsty color:#blue;
 	}
 	
-	reflex receivedMenu when:!empty(proposes) {
+	reflex receivedMenu when:status = 1 and !empty(proposes) {
 		message m <- proposes[0];
 		list<string> menu <- (m.contents);
 		
@@ -97,7 +116,7 @@ species Guest  skills:[moving,fipa]{
 		
 		write name+"got menu:"+m.contents color:#purple;
 		write name+"Selected:"+selectedItem color:#purple;
-		
+		status <- 2;
 		do accept_proposal message:m contents: [selectedItem];
 	}	
 	
@@ -114,41 +133,55 @@ species Guest  skills:[moving,fipa]{
 //		
 //		
 //	}
-	reflex selectBeverage when:!empty(informs){
+	reflex selectBeverage when: status = 2 and !empty(informs){
 		message m <- informs[0];
 		float alchoolIncrement <- float(m.contents[0]);
 		
-		drankness<- drankness+alchoolIncrement;
+		drunkness<- drunkness+alchoolIncrement;
+		status <-3;
 	}
 	
-	reflex imDrunk when:drankness>=1{
+	reflex imDrunk when:drunkness>=1{
 		write name+"sono sbronzo!" color:#red;
 	}
 	
 	reflex arrived2location when: targetPoint!= nil and location distance_to(targetPoint) < 1{
-		busy<-false;
 		targetPoint<-nil;
 	}
 	
-	reflex dance when: busy=false{
+	reflex dance when: status = 4{
 		if (flip (chill2dance) = true){
 			do wander;
 		}
 	}
 	
-    reflex goToStage when:chill2dance>= danceTrashold  and location distance_to(StageLocation) > 5 {
-    	busy <- true;
+    reflex goToStage when:status = 3 and chill2dance>= danceTrashold  and location distance_to(StageLocation) > 5 {
     	targetPoint<-StageLocation;
     }    
     
-    reflex goToChill when:chill2dance< danceTrashold  and location distance_to(ChillLocation) > 5{
-    	busy <- true;
+    reflex goToChill when:status = 3 and chill2dance< danceTrashold  and location distance_to(ChillLocation) > 5{
     	targetPoint<-ChillLocation;
     }    
     
-    reflex goToBar when:thirsty>= thirstyTrashold {
-    	busy <- true;
+    reflex goToBar when:status  = 4 and thirsty>= thirstyTrashold {
     	targetPoint<-BarLocation;
+    	status <-0;
+    }
+    
+    reflex arrivedAtdanceFloor when:status = 3 and (location distance_to(StageLocation)<1 or location distance_to(ChillLocation)<1) {
+    	status <- 4;
+    }
+     
+    reflex SecurityInteraction when:status =1 and !empty(informs) and informs[0].sender = list(Security)[0]{
+		message m <- informs[0];
+	
+		targetPoint<-m.contents[0];
+		
+    }
+
+    //on the exit square
+    reflex exitFestival when: location distance_to(ExitLocation)<1{
+    	do die;
     }
     
     
@@ -209,17 +242,41 @@ species Bar skills:[fipa]{
 	rgb myColor <- #greenyellow;
 	int width <- 20;
 	int length <- 10;
-	int height <- 10;
+	//int height <- 10;
+	int height <- 0;
 	
+	float drunknesThreshold <- 0.4;
+	
+	//list<string> beverages  		<- ['Grappa', 'Montenegro', 'Beer', 'Wine','Soda', 'Cola', 'Juice', 'Julmust'];
+	//list<float> alchoolPercentage 	<- [	0.4, 	0.23, 		0.05, 	0.12,	0.0, 	0.0, 	0.0, 	0.0];
 	list<string> beverages  		<- ['Grappa', 'Montenegro', 'Beer', 'Wine','Soda', 'Cola', 'Juice', 'Julmust'];
-	list<float> alchoolPercentage 	<- [	0.4, 	0.23, 		0.05, 	0.12,	0.0, 	0.0, 	0.0, 	0.0];
+	list<float> alchoolPercentage 	<- [	0.9, 	0.93, 		0.95, 	0.92,	0.9, 	0.9, 	0.9, 	0.9];
 	
-	reflex provideMenu when:!empty(cfps){
+	reflex evaluateDrunkness when:!empty(cfps){
 		message m<-cfps[0];
-		write name+" message m sender:"+m color:#orange;
-		do reply message:m performative:"propose" contents:beverages;
-		write name+" got asked the menu! providing:"+beverages color:#orange;
+		Guest g<-m.sender;
+		float userDrunkness <- m.contents[0];
+		
+		//drunk guest, signal to security
+		if(userDrunkness>=drunknesThreshold){
+			write "reporting "+g + "is drunk";
+			write "location of "+g + "is"+g.location;
+			do start_conversation to: list(Security) protocol: 'fipa-contract-net' performative: 'inform' contents: [g] ;
+		}
+		// guest not drunk, provide menu
+		else{
+			write name+" got asked the menu! providing:"+beverages color:#orange;	
+			do reply message:m performative:"propose" contents:beverages;
+		}
+		
 	}
+	
+//	reflex provideMenu when:!empty(cfps){
+//		message m<-cfps[0];
+//		write name+" message m sender:"+m color:#orange;
+//		do reply message:m performative:"propose" contents:beverages;
+//		write name+" got asked the menu! providing:"+beverages color:#orange;
+//	}
 	
 	reflex serveDrink when:!empty(accept_proposals){
 		message m <- accept_proposals[0];
@@ -246,13 +303,18 @@ species Security skills:[moving, fipa]{
 		do goto target: {3,50};
 	}
 	
-	reflex kickOff when:target != nil and location distance_to(target) < 1 {
+	reflex gotReport when:!empty(informs){
+		message m <- informs[0];
+		Guest g<-m.contents[0];
+		target<-g;
 		
-		ask target{
-			//do die;
-			busy<-true;
-			targetPoint<-ExitLocation;
-		}
+		write "got a report of :"+ g color:#pink;
+		
+	}
+	
+	reflex kickOff when:target != nil and location distance_to(target) < 1 {
+		do start_conversation to: [target] protocol: 'fipa-contract-net' performative: 'inform' contents: [ExitLocation] ;
+
 	}
 	reflex arriveToExit when: location distance_to(ExitLocation) < 9 {
 		target<-nil;
