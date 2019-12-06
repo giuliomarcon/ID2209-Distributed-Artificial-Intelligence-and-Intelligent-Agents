@@ -9,11 +9,26 @@ model finalProject0
 
 
 global {
+	int doorSize<-6;
+	
 	point StageLocation <- {85,85};
+	point EntranceLocation <-{doorSize/2,doorSize/2};
+	point ExitLocation <-{100-doorSize/2,doorSize/2};
+	
 	point ChillLocation <- {15,85};
 	point BarLocation <- {50,50};
+	point securityLocation <- {3,50};
+	
 	
 	init{
+		create Entrance number: 1{
+			location <-EntranceLocation;
+		}
+		
+		create Exit number: 1{
+			location <- ExitLocation;
+		}
+		
 		create Stage number: 1 {
 				location <- StageLocation;
 		}
@@ -24,11 +39,14 @@ global {
 				location <- BarLocation;
 		}
 		
-		create ChillGuest number: 5 {
+		create ChillGuest number: 1{
 				location <- {rnd(50-10,50+10),rnd(50-10,50+10)};
 		}
-		create PartyGuest number: 5 {
+		create PartyGuest number: 0 {
 				location <- {rnd(50-10,50+10),rnd(50-10,50+10)};
+		}
+		create Security number: 1 {
+				location <- securityLocation;
 		}
 		
 	}
@@ -63,23 +81,40 @@ species Guest  skills:[moving,fipa]{
 	}
 	
 	reflex askMenuBar when:thirsty>=thirstyTrashold and location distance_to(BarLocation) < 0.5{
-		do start_conversation to: list(Bar) protocol: 'fipa-contract-net' performative: 'query' contents: [] ;
+		do start_conversation to: list(Bar) protocol: 'fipa-contract-net' performative: 'cfp' contents: ['1'] ;
 		
 		thirsty<-0.0;
 		write name+ "ask the menu:"+thirsty color:#blue;
 	}
 	
-	reflex selectBeverage when:!empty(informs){
-		message m <- informs[0];
-		int numElem <- length(m.contents);
-		int selectedItem <- rnd(0,numElem);
+	reflex receivedMenu when:!empty(proposes) {
+		message m <- proposes[0];
+		list<string> menu <- (m.contents);
 		
-		write name+"got menu:"+m.contents;
+		int numElem <- length(menu);
+		int selectedItem <- rnd(0,numElem-1);
 		
-		do request message:m contents: [selectedItem];
+		
+		write name+"got menu:"+m.contents color:#purple;
+		write name+"Selected:"+selectedItem color:#purple;
+		
+		do accept_proposal message:m contents: [selectedItem];
 	}	
 	
-	reflex selectBeverage when:!empty(agrees){
+
+//	reflex logMessages {
+//		loop c over:conversations{
+//			write "conversation with:"+c;
+//		}
+//		loop m over:mailbox{
+//			write "meesage::"+m;
+//		}
+//		write "proposes length:"+length(proposes) color:#pink;
+//		write "is proposes not empty?:"+!empty(proposes) color:#pink;
+//		
+//		
+//	}
+	reflex selectBeverage when:!empty(informs){
 		message m <- informs[0];
 		float alchoolIncrement <- float(m.contents[0]);
 		
@@ -179,18 +214,71 @@ species Bar skills:[fipa]{
 	list<string> beverages  		<- ['Grappa', 'Montenegro', 'Beer', 'Wine','Soda', 'Cola', 'Juice', 'Julmust'];
 	list<float> alchoolPercentage 	<- [	0.4, 	0.23, 		0.05, 	0.12,	0.0, 	0.0, 	0.0, 	0.0];
 	
-	reflex provideMenu when:!empty(queries){
-		message m<-queries[0];
-		write name+" got asked the menu!" color:#orange;
-		do inform message:m contents:[beverages];
+	reflex provideMenu when:!empty(cfps){
+		message m<-cfps[0];
+		write name+" message m sender:"+m color:#orange;
+		do reply message:m performative:"propose" contents:beverages;
+		write name+" got asked the menu! providing:"+beverages color:#orange;
 	}
 	
-	reflex serveDrink when:!empty(requests){
-		message m <- requests[0];
-		do agree message:m contents:[alchoolPercentage[int(m.contents[0])]];
+	reflex serveDrink when:!empty(accept_proposals){
+		message m <- accept_proposals[0];
+		do inform message:m contents:[alchoolPercentage[int(m.contents[0])]];
 	}
 	aspect default{
 		draw box(width, length, height) at: location color: myColor;
+	}
+}
+
+species Security skills:[moving, fipa]{
+	rgb myColor <- #red;
+	Guest target <- nil;
+	
+	reflex changeColor{
+		if myColor = #red {
+			myColor<-#blue;
+		}else{
+			myColor <-#red;
+		}
+	}
+	
+	reflex initialPosition when: target=nil {
+		do goto target: {3,50};
+	}
+	
+	reflex kickOff when:target != nil and location distance_to(target) < 1 {
+		
+		ask target{
+			//do die;
+			busy<-true;
+			targetPoint<-ExitLocation;
+		}
+	}
+	reflex arriveToExit when: location distance_to(ExitLocation) < 9 {
+		target<-nil;
+		
+	}
+	reflex moveToTarget when: target != nil {
+		do goto target:target;
+	}
+	
+	aspect default{
+		draw sphere(1.5) at:location color: myColor;
+	}
+	
+}
+
+species Entrance{
+	
+	aspect default{
+		draw square(doorSize) at: location color: #green;
+	}
+}
+
+species Exit{
+	
+	aspect default{
+		draw square(doorSize) at: location color: #red;
 	}
 }
 
@@ -198,13 +286,16 @@ species Bar skills:[fipa]{
 experiment Festival type: gui {
 	output {
 		display map type: opengl {
+			species Entrance;
+			species Exit;
+
 			species Stage;
 			species ChillArea;
 			species Bar;
 			
 			species ChillGuest;
 			species PartyGuest;
-
+			species Security;
 		}
 	}
 }
