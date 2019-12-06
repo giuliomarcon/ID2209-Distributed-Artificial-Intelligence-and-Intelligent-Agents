@@ -39,10 +39,10 @@ global {
 				location <- BarLocation;
 		}
 		
-		create ChillGuest number: 1{
+		create ChillGuest number: 5{
 				location <- {rnd(50-10,50+10),rnd(50-10,50+10)};
 		}
-		create PartyGuest number: 0 {
+		create PartyGuest number: 5 {
 				location <- {rnd(50-10,50+10),rnd(50-10,50+10)};
 		}
 		create Security number: 1 {
@@ -82,8 +82,8 @@ species Guest  skills:[moving,fipa]{
 	reflex updateThirsty when:thirsty<thirstyTrashold and status = 4 {
 		//if (flip (0.1) = true){
 		if(true){
-			//thirsty <- thirsty + rnd(0.0, 0.01);
-			thirsty <- thirsty + 0.3;
+			thirsty <- thirsty + rnd(0.0, 0.01);
+			//thirsty <- thirsty + 0.3;
 			//write name+ "thirsty:"+thirsty;
 		}
 	}
@@ -94,7 +94,7 @@ species Guest  skills:[moving,fipa]{
 //		write name+ "ask the menu:"+thirsty color:#blue;
 //	}
 
-	reflex logTreats{
+	reflex logTreats when:false{
 		write "drunkness:"+drunkness +" thirsty:"+thirsty+ " status:"+status;
 	}
 	
@@ -290,7 +290,15 @@ species Bar skills:[fipa]{
 species Security skills:[moving, fipa]{
 	rgb myColor <- #red;
 	Guest target <- nil;
+	int status <- 0;
 	
+	/*
+	 * status
+	 * 0: in resting position
+	 * 1: received report, going to target
+	 * 2: said to target to leave
+	 * 3: reached exit
+	 */
 	reflex changeColor{
 		if myColor = #red {
 			myColor<-#blue;
@@ -301,23 +309,26 @@ species Security skills:[moving, fipa]{
 	
 	reflex initialPosition when: target=nil {
 		do goto target: {3,50};
+		status <- 0;
 	}
 	
-	reflex gotReport when:!empty(informs){
+	reflex gotReport when:status = 0 and !empty(informs){
 		message m <- informs[0];
 		Guest g<-m.contents[0];
 		target<-g;
 		
-		write "got a report of :"+ g color:#pink;
+		status <- 1;
 		
+		write "got a report of :"+ g color:#pink;
 	}
 	
-	reflex kickOff when:target != nil and location distance_to(target) < 1 {
+	reflex kickOff when:status=1 and target != nil and location distance_to(target) < 1 {
 		do start_conversation to: [target] protocol: 'fipa-contract-net' performative: 'inform' contents: [ExitLocation] ;
-
+		status <- 2;
 	}
-	reflex arriveToExit when: location distance_to(ExitLocation) < 9 {
+	reflex arriveToExit when: status =2 and location distance_to(ExitLocation) < 9 {
 		target<-nil;
+		status<-3;
 		
 	}
 	reflex moveToTarget when: target != nil {
@@ -326,6 +337,9 @@ species Security skills:[moving, fipa]{
 	
 	aspect default{
 		draw sphere(1.5) at:location color: myColor;
+	}
+	reflex logSecurity when:true{
+		write "status:"+status;
 	}
 	
 }
