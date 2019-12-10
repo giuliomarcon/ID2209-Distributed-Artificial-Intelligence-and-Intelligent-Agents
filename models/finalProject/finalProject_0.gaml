@@ -20,7 +20,7 @@ global {
 	point BarLocation <- {50,50};
 	point securityLocation <- {3,50};
 	
-	point tableInitialPosion <- {10, 10};
+	point tableInitialPosion <- {30, 10};
 	list<point> tablePositions;
 	list<bool> tableBookings;
 	//ture table booked, false not
@@ -219,6 +219,11 @@ species Guest  skills:[moving,fipa]{
     	}else{
     		write name + " recived failed approach";
 			do end_conversation message:m contents:[];
+			
+			//unbook table
+    		int bookedTableNumber <- int(m.contents[1]);
+    		tableBookings[bookedTableNumber]<-false;
+    		
     		status <- 4;
     	}
     }
@@ -237,10 +242,6 @@ species Guest  skills:[moving,fipa]{
     		Guest potentialMate <- neighbourGuests[0];
 	    	write name+" found "+potentialMate color:#darkgreen;
 	    	
-	    	ask potentialMate { 
-			     write name + " my status is "+status;
-			}
-			
     		bool tableStatus <- false;
     		
     		//booking table 
@@ -250,35 +251,32 @@ species Guest  skills:[moving,fipa]{
     		
 	    	write name+" -> "+potentialMate +"lets go to table "+tableIndex color:#darkgreen;
     		
-    		point myPosition <- tablePositions[tableIndex]-{tableRadius,0};
-    		point partnerPosition <- tablePositions[tableIndex]+{tableRadius,0};
+    		point myPosition <- tablePositions[tableIndex]-{tableRadius,0}+{0,2*tableRadius};
+    		point partnerPosition <- tablePositions[tableIndex]+{tableRadius,0}+{0,2*tableRadius};
     		
     		//comunicating where to go
-    		do start_conversation to: list(potentialMate) protocol: 'fipa-contract-net' performative: 'inform' contents: [partnerPosition,myPosition] ;
-    		
-    		
-	    	ask potentialMate { 
-	    	
-			     write name + " my informs contains "+informs;
-			}
+    		do start_conversation to: list(potentialMate) protocol: 'fipa-contract-net' performative: 'inform' contents: [partnerPosition,myPosition,tableIndex] ;
+    		write name+"I had proposed table"+tableIndex;
     		status <- 5;
     	}
     	
     }
     
     //receive inform message by other guest, but i'm already busy talking
-    reflex receivedApproach when:status!=4 and !empty(informs) {//and list(Guest) contains informs[0].sender{
+    reflex receivedApproachFailed when:status!=4 and !empty(informs) {//and list(Guest) contains informs[0].sender{
     	message m<- informs[0];
+    	int bookedTableNumber <- int(m.contents[2]);
 		write name+" sorry "+m.sender+" i'm already busy (status:"+status+")";
-		do inform message:m contents:[false];
+		write "proposed table:"+bookedTableNumber;
+		do inform message:m contents:[false,bookedTableNumber];
     	
 		
     }
     
     //receive inform message by other guest
-    reflex receivedApproachFailed when:status=4 and !empty(informs) {//and list(Guest) contains informs[0].sender{
+    reflex receivedApproach when:status=4 and !empty(informs) {//and list(Guest) contains informs[0].sender{
     	message m<- informs[0];
-		targetPoint<-m.contents[0];
+		targetPoint<-m.contents[1];
 		point matePoint<-m.contents[0];
 		write name+": "+m.sender+" approached me, going to point:"+targetPoint;
 		do inform message:m contents:[true,matePoint];
