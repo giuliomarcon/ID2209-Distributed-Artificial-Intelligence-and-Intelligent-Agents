@@ -107,8 +107,8 @@ species Guest  skills:[moving,fipa]{
 	}
 	
 	reflex updateThirsty when:thirsty<thirstyTrashold and status = 4 {
-		//if (flip (0.1) = true){
-		if(true){
+		if (flip (0.1) = true){
+//		if(true){
 			thirsty <- thirsty + rnd(0.0, 0.01);
 			//thirsty <- thirsty + 0.3;
 			//write name+ "thirsty:"+thirsty;
@@ -245,7 +245,7 @@ species Guest  skills:[moving,fipa]{
     	list<Guest> neighbourGuests <- (ChillGuest at_distance 10);
     	neighbourGuests<-shuffle(neighbourGuests);
     	    	
-    	if(flip(talkative/10) and length(neighbourGuests)>0){
+    	if(flip(talkative/50) and length(neighbourGuests)>0){
     		write name+" there are:"+length(neighbourGuests)+" potential mates";
     		Guest potentialMate <- neighbourGuests[0];
 	    	write name+" found "+potentialMate color:#darkgreen;
@@ -372,11 +372,40 @@ species Guest  skills:[moving,fipa]{
 } 
 
 species ChillGuest parent: Guest{
+	
+	bool increasingC2D;
+	
 	init{
 		talkative <- rnd(0.0,1.0);
 		chill2dance <- rnd(0.0,0.3);
+		increasingC2D<-flip(0.3);
 	}
 	
+	reflex updateC2D when: status=4{
+		if(increasingC2D ){
+			float incresingStep <- rnd(0.0,0.0002);
+			
+			if ((incresingStep + chill2dance)<= 1){
+				chill2dance <- chill2dance + incresingStep;
+			}else{
+				increasingC2D <-false;
+				status<-3;
+			}
+		}else{
+			float decresingStep <- rnd(0.0,0.002);
+			
+			if ((chill2dance-decresingStep)>= 0){
+				chill2dance <- chill2dance - decresingStep;
+			}else{
+				increasingC2D <-true;
+				status<-3;
+			}
+		}
+		
+	}
+		
+		
+		
    	aspect default{
        	draw cone3D(1.3,2.3) at: location color: #slategray ;
     	draw sphere(0.7) at: location + {0, 0, 2} color: #blue ;
@@ -384,10 +413,38 @@ species ChillGuest parent: Guest{
 }
 
 species PartyGuest parent: Guest{
+	bool increasingC2D;
 	init{
 		talkative <- rnd(0.0,1.0);
 		chill2dance <- rnd(0.4,1.0);
+		increasingC2D<-flip(0.8);
 	}
+	
+	reflex updateC2D when: status=4{
+		if(increasingC2D ){
+			float incresingStep <- rnd(0.0,0.002);
+			
+			if ((incresingStep + chill2dance)<= 1){
+				chill2dance <- chill2dance + incresingStep;
+			}else{
+				increasingC2D <-false;
+				status<-3;
+			}
+		}else{
+			float decresingStep <- rnd(0.0,0.0002);
+			
+			if ((chill2dance-decresingStep)>= 0){
+				chill2dance <- chill2dance - decresingStep;
+			}else{
+				increasingC2D <-true;
+				status<-3;
+			}
+		}
+		
+		
+		
+	}
+	
 	
    aspect default{
        	draw cone3D(1.3,2.3) at: location color: #slategray ;
