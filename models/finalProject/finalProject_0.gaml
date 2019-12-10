@@ -10,6 +10,7 @@ model finalProject0
 
 global {
 	int doorSize<-6;
+	int tableRadius<-3;
 	
 	point EntranceLocation <-{doorSize/2,doorSize/2};
 	point ExitLocation <-{100-doorSize/2,doorSize/2};
@@ -19,8 +20,26 @@ global {
 	point BarLocation <- {50,50};
 	point securityLocation <- {3,50};
 	
+	point tableInitialPosion <- {10, 10};
+	list<point> tablePositions;
+	list<bool> tableBookings;
+	//ture table booked, false not
+	
+	int  tableNumber <-3;
 	
 	init{
+		//init table positions
+		loop i from: 1 to: tableNumber { 
+			add tableInitialPosion to:tablePositions;
+			tableInitialPosion <- tableInitialPosion + {0, tableRadius*2.5};
+			add false to:tableBookings;
+			
+			create Table number:1 {
+				location <- tableInitialPosion;
+			}
+			
+		}
+		
 		create Entrance number: 1{
 			location <-EntranceLocation;
 		}
@@ -157,10 +176,12 @@ species Guest  skills:[moving,fipa]{
 	
     reflex goToStage when:status = 3 and chill2dance>= danceTrashold  and location distance_to(StageLocation) > 5 {
     	targetPoint<-StageLocation;
+    	//write name + "belongs to party stage";
     }    
     
     reflex goToChill when:status = 3 and chill2dance< danceTrashold  and location distance_to(ChillLocation) > 5{
     	targetPoint<-ChillLocation;
+    	//write name + "belongs to chill stage";
     }    
     
     reflex goToBar when:status  = 4 and thirsty>= thirstyTrashold {
@@ -168,7 +189,7 @@ species Guest  skills:[moving,fipa]{
     	status <-0;
     }
     
-    reflex arrivedAtdanceFloor when:status = 3 and (location distance_to(StageLocation)<1 or location distance_to(ChillLocation)<1) {
+    reflex arrivedAtdanceFloor when:status = 3 and (location distance_to(StageLocation)<5 or location distance_to(ChillLocation)<5) {
     	status <- 4;
     }
      
@@ -177,6 +198,97 @@ species Guest  skills:[moving,fipa]{
 	
 		targetPoint<-m.contents[0];
 		
+    }
+    
+    reflex chackCondition when:false  and status=4{
+    	write name+"status 4";
+    }
+    
+
+    
+    reflex mateReply when:status=5 and !empty(informs){
+    	message m<-informs[0];
+    	bool approchSuccess <- bool(m.contents[0]);
+    
+    	if(approchSuccess)	{
+    		//going to the table
+    		write name + " approach suceed message";
+    		point myPosition <- m.contents[1];
+    		targetPoint<-myPosition;
+    		status <- 6;
+    	}else{
+    		write name + " recived failed approach";
+			do end_conversation message:m contents:[];
+    		status <- 4;
+    	}
+    }
+    
+  
+
+    
+    reflex lookingForMate when:status=4 and location distance_to(ChillLocation)<5 and tableBookings contains(false){
+    	//write name+" I'm lookig for a mate! " color:#darkgreen;
+    	
+    	list<Guest> neighbourGuests <- (ChillGuest at_distance 10);
+    	neighbourGuests<-shuffle(neighbourGuests);
+    	    	
+    	if(flip(talkative/10) and length(neighbourGuests)>0){
+    		write name+" there are:"+length(neighbourGuests)+" potential mates";
+    		Guest potentialMate <- neighbourGuests[0];
+	    	write name+" found "+potentialMate color:#darkgreen;
+	    	
+	    	ask potentialMate { 
+			     write name + " my status is "+status;
+			}
+			
+    		bool tableStatus <- false;
+    		
+    		//booking table 
+    		int tableIndex <-index_of(tableBookings,tableStatus);
+    		tableBookings[tableIndex]<-true;
+    		
+    		
+	    	write name+" -> "+potentialMate +"lets go to table "+tableIndex color:#darkgreen;
+    		
+    		point myPosition <- tablePositions[tableIndex]-{tableRadius,0};
+    		point partnerPosition <- tablePositions[tableIndex]+{tableRadius,0};
+    		
+    		//comunicating where to go
+    		do start_conversation to: list(potentialMate) protocol: 'fipa-contract-net' performative: 'inform' contents: [partnerPosition,myPosition] ;
+    		
+    		
+	    	ask potentialMate { 
+	    	
+			     write name + " my informs contains "+informs;
+			}
+    		status <- 5;
+    	}
+    	
+    }
+    
+    //receive inform message by other guest, but i'm already busy talking
+    reflex receivedApproach when:status!=4 and !empty(informs) {//and list(Guest) contains informs[0].sender{
+    	message m<- informs[0];
+		write name+" sorry "+m.sender+" i'm already busy (status:"+status+")";
+		do inform message:m contents:[false];
+    	
+		
+    }
+    
+    //receive inform message by other guest
+    reflex receivedApproachFailed when:status=4 and !empty(informs) {//and list(Guest) contains informs[0].sender{
+    	message m<- informs[0];
+		targetPoint<-m.contents[0];
+		point matePoint<-m.contents[0];
+		write name+": "+m.sender+" approached me, going to point:"+targetPoint;
+		do inform message:m contents:[true,matePoint];
+		status <- 6;
+    }
+
+ 
+    
+    reflex logStatus when:false {
+    	write name + "status:"+status;
     }
 
     //on the exit square
@@ -247,11 +359,11 @@ species Bar skills:[fipa]{
 	
 	float drunknesThreshold <- 0.4;
 	
-	//list<string> beverages  		<- ['Grappa', 'Montenegro', 'Beer', 'Wine','Soda', 'Cola', 'Juice', 'Julmust'];
-	//list<float> alchoolPercentage 	<- [	0.4, 	0.23, 		0.05, 	0.12,	0.0, 	0.0, 	0.0, 	0.0];
 	list<string> beverages  		<- ['Grappa', 'Montenegro', 'Beer', 'Wine','Soda', 'Cola', 'Juice', 'Julmust'];
-	list<float> alchoolPercentage 	<- [	0.9, 	0.93, 		0.95, 	0.92,	0.9, 	0.9, 	0.9, 	0.9];
-	
+	list<float> alchoolPercentage 	<- [	0.4, 	0.23, 		0.05, 	0.12,	0.0, 	0.0, 	0.0, 	0.0];
+//	list<string> beverages  		<- ['Grappa', 'Montenegro', 'Beer', 'Wine','Soda', 'Cola', 'Juice', 'Julmust'];
+//	list<float> alchoolPercentage 	<- [	0.9, 	0.93, 		0.95, 	0.92,	0.9, 	0.9, 	0.9, 	0.9];
+//	
 	reflex evaluateDrunkness when:!empty(cfps){
 		message m<-cfps[0];
 		Guest g<-m.sender;
@@ -338,7 +450,7 @@ species Security skills:[moving, fipa]{
 	aspect default{
 		draw sphere(1.5) at:location color: myColor;
 	}
-	reflex logSecurity when:true{
+	reflex logSecurity when:false{
 		write "status:"+status;
 	}
 	
@@ -348,6 +460,13 @@ species Entrance{
 	
 	aspect default{
 		draw square(doorSize) at: location color: #green;
+	}
+}
+
+species Table{
+	
+	aspect default{
+		draw circle(tableRadius) at: location color: #green;
 	}
 }
 
@@ -368,6 +487,7 @@ experiment Festival type: gui {
 			species Stage;
 			species ChillArea;
 			species Bar;
+			species Table;
 			
 			species ChillGuest;
 			species PartyGuest;
