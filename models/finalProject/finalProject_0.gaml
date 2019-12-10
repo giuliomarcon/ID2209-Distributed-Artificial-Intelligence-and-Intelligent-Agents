@@ -27,6 +27,8 @@ global {
 	
 	int  tableNumber <-3;
 	
+	float communicationIncreasigFactor <- 0.1;
+	
 	init{
 		//init table positions
 		loop i from: 1 to: tableNumber { 
@@ -86,12 +88,18 @@ species Guest  skills:[moving,fipa]{
 	float thirstyTrashold <- 1.0;
 
 	int status<-3;
+	
+	int tableUsedIndex;
+	message tableConversationMessage ;
 	/*
 	 * 0: want to drink
 	 * 1: asked menu
 	 * 2: received menu, ask for a drink
 	 * 3: drinked, redy to go chill\dance;
 	 * 4: wandering
+	 * 5: approched guest reply
+	 * 6: guests goes to the booked table
+	 * 7: guest is at the table
 	 */
 	
 	reflex moveToTarget when: targetPoint != nil {
@@ -216,6 +224,7 @@ species Guest  skills:[moving,fipa]{
     		point myPosition <- m.contents[1];
     		targetPoint<-myPosition;
     		status <- 6;
+    		tableConversationMessage <- m;
     	}else{
     		write name + " recived failed approach";
 			do end_conversation message:m contents:[];
@@ -228,8 +237,7 @@ species Guest  skills:[moving,fipa]{
     	}
     }
     
-  
-
+ 
     
     reflex lookingForMate when:status=4 and location distance_to(ChillLocation)<5 and tableBookings contains(false){
     	//write name+" I'm lookig for a mate! " color:#darkgreen;
@@ -255,8 +263,9 @@ species Guest  skills:[moving,fipa]{
     		point partnerPosition <- tablePositions[tableIndex]+{tableRadius,0}+{0,2*tableRadius};
     		
     		//comunicating where to go
+    		tableUsedIndex<-tableIndex;
+    		
     		do start_conversation to: list(potentialMate) protocol: 'fipa-contract-net' performative: 'inform' contents: [partnerPosition,myPosition,tableIndex] ;
-    		write name+"I had proposed table"+tableIndex;
     		status <- 5;
     	}
     	
@@ -265,10 +274,10 @@ species Guest  skills:[moving,fipa]{
     //receive inform message by other guest, but i'm already busy talking
     reflex receivedApproachFailed when:status!=4 and !empty(informs) {//and list(Guest) contains informs[0].sender{
     	message m<- informs[0];
-    	int bookedTableNumber <- int(m.contents[2]);
+    	tableUsedIndex <- int(m.contents[2]);
 		write name+" sorry "+m.sender+" i'm already busy (status:"+status+")";
-		write "proposed table:"+bookedTableNumber;
-		do inform message:m contents:[false,bookedTableNumber];
+		write "proposed table:"+tableUsedIndex;
+		do inform message:m contents:[false,tableUsedIndex];
     	
 		
     }
@@ -280,10 +289,69 @@ species Guest  skills:[moving,fipa]{
 		point matePoint<-m.contents[0];
 		write name+": "+m.sender+" approached me, going to point:"+targetPoint;
 		do inform message:m contents:[true,matePoint];
-		status <- 6;
+		status <- 7;
     }
-
- 
+    
+    //approching guest says its chill2dance vale
+  	reflex rechedTable when: status=6 and location distance_to(targetPoint)<2 {
+  		do cfp message:tableConversationMessage contents:[chill2dance];
+  		status <-7;
+  	}
+  	
+  	//approched guest receive chill2dance of approcher
+  	reflex getC2D when: status = 7 and !empty(cfps){
+		message m <- cfps[0];
+		float c2dApprocher <- float(m.contents[0]); 
+		float c2dApprocherExtreme <- float(m.contents[0]); 
+		float c2dExtreme <- chill2dance;
+		
+		if(c2dApprocherExtreme > 0.5){
+			c2dApprocherExtreme <- 1 - c2dApprocherExtreme;	
+		}
+		
+		if(c2dExtreme > 0.5){
+			c2dExtreme <- 1 - c2dExtreme;	
+		}
+		
+		//approcher  chilldance is  closer to the relative extreme than mine
+		if(c2dApprocherExtreme < c2dExtreme){
+			if( c2dApprocher>0.5){
+				chill2dance <- chill2dance + communicationIncreasigFactor;
+			}else{
+				chill2dance <- chill2dance - communicationIncreasigFactor;
+			}
+			do propose  message:m contents:[0];
+			
+			
+		}else{
+			//mine chill2dance is closer to the relative extreme
+			if(chill2dance > 0.5){
+				do propose  message:m contents:[communicationIncreasigFactor];
+			}else{
+				do propose  message:m contents:[0-communicationIncreasigFactor];
+			}
+		}
+		
+		
+    	write name+"sent info about the outcome of the conversation " + m.contents[0] + "go back to previous activity";
+    	//go back to previous activity
+    	status <-3;
+    	
+    	//unbook tabels
+    	tableBookings[tableUsedIndex]<- false;
+  	}
+    
+    //received info about the outcome of the conversation
+    reflex gotProposal when: !empty(proposes) and status = 7 {
+    	message m <- proposes[0];
+    	chill2dance <- chill2dance + float(m.contents[0]);
+    	// TODO end_conversation
+    	
+    	write name+"received info about the outcome of the conversation " + m.contents[0] + "go back to previous activity";
+    	
+    	//go back to previous activity
+    	status <-3;
+    }
     
     reflex logStatus when:false {
     	write name + "status:"+status;
