@@ -17,27 +17,36 @@ global {
 	
 	point StageLocation <- {85,85};
 	point ChillLocation <- {15,85};
+	point TinderLocation <- {85,30};
 	point BarLocation <- {50,50};
 	point securityLocation <- {3,50};
 	
-	point tableInitialPosion <- {30, 10};
+	int tablePerRow <- 5;
+	point tableInitialPosion <- {10, 10};
 	list<point> tablePositions;
 	list<bool> tableBookings;
 	//ture table booked, false not
 	
-	int  tableNumber <-3;
+	int  tableNumber <-20;
 	
 	float communicationIncreasigFactor <- 0.1;
 	
 	init{
 		//init table positions
+		point tablePosion <- tableInitialPosion;
+		
 		loop i from: 1 to: tableNumber { 
 			add tableInitialPosion to:tablePositions;
-			tableInitialPosion <- tableInitialPosion + {0, tableRadius*2.5};
+			if ((i mod tablePerRow) = 0 and i>1){
+				tablePosion <-  tableInitialPosion + {(i/tablePerRow)*tableRadius*4.5,0};
+			}else if ( i>1){
+				tablePosion <- tablePosion + {0, tableRadius*2.5};
+			}
+			
 			add false to:tableBookings;
 			
 			create Table number:1 {
-				location <- tableInitialPosion;
+				location <- tablePosion;
 			}
 			
 		}
@@ -56,12 +65,20 @@ global {
 		create ChillArea number: 1 {
 				location <- ChillLocation;
 		}
+		create TinderArea number: 1 {
+				location <- TinderLocation;
+		}
 		create Bar number: 1 {
 				location <- BarLocation;
 		}
 		
 		create ChillGuest number: 5{
 				location <- {rnd(50-10,50+10),rnd(50-10,50+10)};
+				if(flip(0.5)){
+					gender<-'M';
+				}else{
+					gender<-'F';
+				}
 		}
 		create PartyGuest number: 5 {
 				location <- {rnd(50-10,50+10),rnd(50-10,50+10)};
@@ -77,18 +94,25 @@ global {
 species Guest  skills:[moving,fipa]{
 	rgb guestColor <- #red;	
 	point targetPoint <- nil;
-	
+
+	int neighbouDistance <- 10;
+
 	// Treats
 	float drunkness <- 0.0;
 	float talkative <- 0.0;
+	float love <- 0.0;
 	float thirsty <- 0.0;
 	float chill2dance <- 0.0;
+	string gender;
 	
+	
+	
+	float loveTrashold <- 1;
 	float danceTrashold <- 0.5;
 	float thirstyTrashold <- 1.0;
 
 	int status<-3;
-	
+
 	int tableUsedIndex;
 	message tableConversationMessage ;
 	/*
@@ -100,6 +124,12 @@ species Guest  skills:[moving,fipa]{
 	 * 5: approched guest reply
 	 * 6: guests goes to the booked table
 	 * 7: guest is at the table
+	 * 8: guest going to tinderArea
+	 * 9: guest reached tinderArea
+	 * 10: guests matched at tinderArea, going to table
+	 * 11: guests received approach in the tinderArea, evaluating partner
+	 * 12: approcher (tinder) goinig to booked table
+	 * 13: approcher (tinder) reached to booked table
 	 */
 	
 	reflex moveToTarget when: targetPoint != nil {
@@ -107,7 +137,7 @@ species Guest  skills:[moving,fipa]{
 	}
 	
 	reflex updateThirsty when:thirsty<thirstyTrashold and status = 4 {
-		if (flip (0.1) = true){
+		if (flip (0.5) = true){
 //		if(true){
 			thirsty <- thirsty + rnd(0.0, 0.01);
 			//thirsty <- thirsty + 0.3;
@@ -122,7 +152,11 @@ species Guest  skills:[moving,fipa]{
 //	}
 
 	reflex logTreats when:false{
-		write "drunkness:"+drunkness +" thirsty:"+thirsty+ " status:"+status;
+		write "drunkness:"+drunkness +" thirsty:"+thirsty+ " status:"+status +" love:"+love;
+	}
+	
+	reflex updateLove when: true{
+		love<-love+rnd(0.0,0.008);
 	}
 	
 	reflex askMenuBar when:status = 0 and thirsty>=thirstyTrashold and location distance_to(BarLocation) < 5{
@@ -130,7 +164,7 @@ species Guest  skills:[moving,fipa]{
 		
 		thirsty<-0.0;
 		status <- 1;
-		write name+ "ask the menu:"+thirsty color:#blue;
+		//write name+ "ask the menu:"+thirsty color:#blue;
 	}
 	
 	reflex receivedMenu when:status = 1 and !empty(proposes) {
@@ -141,8 +175,8 @@ species Guest  skills:[moving,fipa]{
 		int selectedItem <- rnd(0,numElem-1);
 		
 		
-		write name+"got menu:"+m.contents color:#purple;
-		write name+"Selected:"+selectedItem color:#purple;
+		//write name+"got menu:"+m.contents color:#purple;
+		//write name+"Selected:"+selectedItem color:#purple;
 		status <- 2;
 		do accept_proposal message:m contents: [selectedItem];
 	}	
@@ -169,7 +203,7 @@ species Guest  skills:[moving,fipa]{
 	}
 	
 	reflex imDrunk when:drunkness>=1{
-		write name+"sono sbronzo!" color:#red;
+		//write name+"sono sbronzo!" color:#red;
 	}
 	
 	reflex arrived2location when: targetPoint!= nil and location distance_to(targetPoint) < 1{
@@ -196,6 +230,12 @@ species Guest  skills:[moving,fipa]{
     	targetPoint<-BarLocation;
     	status <-0;
     }
+    reflex goToTinder when:status  = 3 and love >= loveTrashold {
+    	write name+"trashold reached";
+    	love<-0.0;
+    	targetPoint<-TinderLocation;
+    	status <-8;
+    }
     
     reflex arrivedAtdanceFloor when:status = 3 and (location distance_to(StageLocation)<5 or location distance_to(ChillLocation)<5) {
     	status <- 4;
@@ -208,8 +248,8 @@ species Guest  skills:[moving,fipa]{
 		
     }
     
-    reflex chackCondition when:false  and status=4{
-    	write name+"status 4";
+    reflex checkCondition when:false  and status=4{
+    	//write name+"status 4";
     }
     
 
@@ -220,7 +260,7 @@ species Guest  skills:[moving,fipa]{
     
     	if(approchSuccess)	{
     		//going to the table
-    		write name + " approach suceed message";
+    		//write name + " approach suceed message";
     		point myPosition <- m.contents[1];
     		targetPoint<-myPosition;
     		status <- 6;
@@ -242,13 +282,19 @@ species Guest  skills:[moving,fipa]{
     reflex lookingForMate when:status=4 and location distance_to(ChillLocation)<5 and tableBookings contains(false){
     	//write name+" I'm lookig for a mate! " color:#darkgreen;
     	
-    	list<Guest> neighbourGuests <- (ChillGuest at_distance 10);
-    	neighbourGuests<-shuffle(neighbourGuests);
+    	list<Guest> neighbourGuests;
+    	list<Guest> ChillneighbourGuests <- (ChillGuest at_distance neighbouDistance);
+    	list<Guest> PartyneighbourGuests <- (PartyGuest at_distance neighbouDistance);
+    	
+    	
+    	add PartyneighbourGuests all:true to: neighbourGuests;
+    	add ChillneighbourGuests all:true to: neighbourGuests;
+    	
     	    	
     	if(flip(talkative/50) and length(neighbourGuests)>0){
-    		write name+" there are:"+length(neighbourGuests)+" potential mates";
+    		//write name+" there are:"+length(neighbourGuests)+" potential mates";
     		Guest potentialMate <- neighbourGuests[0];
-	    	write name+" found "+potentialMate color:#darkgreen;
+	    	//write name+" found "+potentialMate color:#darkgreen;
 	    	
     		bool tableStatus <- false;
     		
@@ -257,7 +303,7 @@ species Guest  skills:[moving,fipa]{
     		tableBookings[tableIndex]<-true;
     		
     		
-	    	write name+" -> "+potentialMate +"lets go to table "+tableIndex color:#darkgreen;
+	    	//write name+" -> "+potentialMate +"lets go to table "+tableIndex color:#darkgreen;
     		
     		point myPosition <- tablePositions[tableIndex]-{tableRadius,0}+{0,2*tableRadius};
     		point partnerPosition <- tablePositions[tableIndex]+{tableRadius,0}+{0,2*tableRadius};
@@ -272,13 +318,13 @@ species Guest  skills:[moving,fipa]{
     }
     
     //receive inform message by other guest, but i'm already busy talking
-    reflex receivedApproachFailed when:status!=4 and !empty(informs) {//and list(Guest) contains informs[0].sender{
+    reflex receivedApproachFailed when:(status!=4 and status!=10 and status!=8 ) and !empty(informs) {//and list(Guest) contains informs[0].sender{
     	message m<- informs[0];
+    	write "ocio:"+m ;
     	tableUsedIndex <- int(m.contents[2]);
 		write name+" sorry "+m.sender+" i'm already busy (status:"+status+")";
-		write "proposed table:"+tableUsedIndex;
+		//write "proposed table:"+tableUsedIndex;
 		do inform message:m contents:[false,tableUsedIndex];
-    	
 		
     }
     
@@ -287,7 +333,7 @@ species Guest  skills:[moving,fipa]{
     	message m<- informs[0];
 		targetPoint<-m.contents[1];
 		point matePoint<-m.contents[0];
-		write name+": "+m.sender+" approached me, going to point:"+targetPoint;
+		//write name+": "+m.sender+" approached me, going to point:"+targetPoint;
 		do inform message:m contents:[true,matePoint];
 		status <- 7;
     }
@@ -333,7 +379,7 @@ species Guest  skills:[moving,fipa]{
 		}
 		
 		
-    	write name+"sent info about the outcome of the conversation " + m.contents[0] + "go back to previous activity";
+    	//write name+"sent info about the outcome of the conversation " + m.contents[0] + "go back to previous activity";
     	//go back to previous activity
     	status <-3;
     	
@@ -347,12 +393,153 @@ species Guest  skills:[moving,fipa]{
     	chill2dance <- chill2dance + float(m.contents[0]);
     	// TODO end_conversation
     	
-    	write name+"received info about the outcome of the conversation " + m.contents[0] + "go back to previous activity";
+    	//write name+"received info about the outcome of the conversation " + m.contents[0] + "go back to previous activity";
     	
     	//go back to previous activity
     	status <-3;
     }
     
+    // REached TinderArea, looking for a soul mate
+    reflex lookingForSoulMate when:status=8 and location distance_to(TinderLocation)<5 and tableBookings contains(false){
+    	//status<-9;
+    	write name+" reached tinderArea";
+    	list<Guest> neighbourGuests;
+    	list<Guest> ChillneighbourGuests <- (ChillGuest at_distance neighbouDistance);
+    	list<Guest> PartyneighbourGuests <- (PartyGuest at_distance neighbouDistance);
+    	
+    	
+    	add PartyneighbourGuests all:true to: neighbourGuests;
+    	add ChillneighbourGuests all:true to: neighbourGuests;
+    	
+    	neighbourGuests<-shuffle(neighbourGuests);
+    	if(flip(talkative/30) and length(neighbourGuests)>0){
+    		write name+" in  tinderArea there are:"+length(neighbourGuests)+" potential mates" color:#red;
+    		Guest potentialMate <- neighbourGuests[0];
+	    	write name+" in  tinderArea  found "+potentialMate color:#darkgreen;
+	    	
+    		bool tableStatus <- false;
+    		
+    		//booking table 
+    		int tableIndex <-index_of(tableBookings,tableStatus);
+    		tableBookings[tableIndex]<-true;
+    		
+    		
+	    	write name+"[in  tinderArea ]-> "+potentialMate +"lets go to table "+tableIndex color:#darkgreen;
+    		
+    		point myPosition <- tablePositions[tableIndex]-{tableRadius,0}+{0,2*tableRadius};
+    		point partnerPosition <- tablePositions[tableIndex]+{tableRadius,0}+{0,2*tableRadius};
+    		
+    		//comunicating where to go
+    		tableUsedIndex<-tableIndex;
+    		
+    		do start_conversation to: list(potentialMate) protocol: 'fipa-contract-net' performative: 'inform' contents: [partnerPosition,myPosition,tableIndex] ;
+    		status <- 10;
+    	}else{
+    		write name+" waiting inthe tinderArea status:"+status color:#lightblue;
+    	}
+    	
+    }
+    
+
+    //receive approach message by other guest
+    reflex receivedTinderApproach when:status=8 and !empty(informs) {//and list(Guest) contains informs[0].sender{
+    	message m<- informs[0];
+		targetPoint<-m.contents[1];
+		point matePoint<-m.contents[0];
+		write name+": "+m.sender+" approached me in  tinderArea , going to point:"+targetPoint color:#blue;
+		do inform message:m contents:[true,matePoint];
+		status <- 11;
+    }
+    
+    //the approched guest replied to table message
+    reflex tinderMateReply when:status=10 and !empty(informs){
+    	message m<-informs[0];
+    	bool approchSuccess <- bool(m.contents[0]);
+    
+    	if(approchSuccess)	{
+    		//going to the table
+    		//write name + " approach suceed message";
+    		point myPosition <- m.contents[1];
+    		targetPoint<-myPosition;
+    		status <- 12;
+    		tableConversationMessage <- m;
+    	}else{
+    		write name + " recived failed approach";
+			do end_conversation message:m contents:[];
+			
+			//unbook table
+    		int bookedTableNumber <- int(m.contents[1]);
+    		tableBookings[bookedTableNumber]<-false;
+    		
+    		status <- 8;
+    	}
+    }
+    
+    //approching tinder guest says its chill2dance vale
+  	reflex rechedTinderTable when: status=12 and location distance_to(targetPoint)<2 {
+  		do cfp message:tableConversationMessage contents:[chill2dance];
+  		status <-13;
+  	}
+  	
+    //approched guest receive chill2dance of approcher
+  	reflex getTinderC2D when: status = 11 and !empty(cfps){
+		message m <- cfps[0];
+		float c2dApprocher <- float(m.contents[0]); 
+		float c2dApprocherExtreme <- float(m.contents[0]); 
+		float c2dExtreme <- chill2dance;
+		
+		write name+ " evauleting tinder mate C2D of"+m.sender;
+		if(c2dApprocherExtreme > 0.5){
+			c2dApprocherExtreme <- 1 - c2dApprocherExtreme;	
+		}
+		
+		if(c2dExtreme > 0.5){
+			c2dExtreme <- 1 - c2dExtreme;	
+		}
+		
+		//approcher  chilldance is  closer to the relative extreme than mine
+		if(c2dApprocherExtreme < c2dExtreme){
+			if( c2dApprocher>0.5){
+				chill2dance <- chill2dance + communicationIncreasigFactor;
+			}else{
+				chill2dance <- chill2dance - communicationIncreasigFactor;
+			}
+			do propose  message:m contents:[0];
+			
+			
+		}else{
+			//mine chill2dance is closer to the relative extreme
+			if(chill2dance > 0.5){
+				do propose  message:m contents:[communicationIncreasigFactor];
+			}else{
+				do propose  message:m contents:[0-communicationIncreasigFactor];
+			}
+		}
+		
+		
+    	write name+"sent info about TINDER the outcome of the conversation " + m.contents[0] + "go back to previous activity" color:#purple;
+    	//go back to previous activity
+    	status <-3;
+    	
+    	//unbook tabels
+    	tableBookings[tableUsedIndex]<- false;
+  	}
+        
+    //received info about the outcome of the Tinder conversation
+    reflex gotTinderDateOutcome when: !empty(proposes) and status =13 {
+    	message m <- proposes[0];
+    	chill2dance <- chill2dance + float(m.contents[0]);
+    	// TODO end_conversation
+    	
+    	write name+"received info about the TINDER outcome of the conversation " + m.contents[0] + "go back to previous activity" color:#violet;
+    	
+    	//go back to previous activity
+    	status <-3;
+    }
+        //received info about the outcome of the conversation
+
+    
+ 
     reflex logStatus when:false {
     	write name + "status:"+status;
     }
@@ -420,6 +607,7 @@ species PartyGuest parent: Guest{
 		increasingC2D<-flip(0.8);
 	}
 	
+	
 	reflex updateC2D when: status=4{
 		if(increasingC2D ){
 			float incresingStep <- rnd(0.0,0.002);
@@ -473,6 +661,14 @@ species ChillArea{
 	}
 }
 
+species TinderArea{	
+	rgb myColor <- #pink;
+	
+	aspect default{
+		draw squircle(15,5) at: location color: myColor;
+	}
+}
+
 species Bar skills:[fipa]{
 	rgb myColor <- #greenyellow;
 	int width <- 20;
@@ -494,13 +690,13 @@ species Bar skills:[fipa]{
 		
 		//drunk guest, signal to security
 		if(userDrunkness>=drunknesThreshold){
-			write "reporting "+g + "is drunk";
-			write "location of "+g + "is"+g.location;
+			//write "reporting "+g + "is drunk";
+			//write "location of "+g + "is"+g.location;
 			do start_conversation to: list(Security) protocol: 'fipa-contract-net' performative: 'inform' contents: [g] ;
 		}
 		// guest not drunk, provide menu
 		else{
-			write name+" got asked the menu! providing:"+beverages color:#orange;	
+			//write name+" got asked the menu! providing:"+beverages color:#orange;	
 			do reply message:m performative:"propose" contents:beverages;
 		}
 		
@@ -554,7 +750,7 @@ species Security skills:[moving, fipa]{
 		
 		status <- 1;
 		
-		write "got a report of :"+ g color:#pink;
+		//write "got a report of :"+ g color:#pink;
 	}
 	
 	reflex kickOff when:status=1 and target != nil and location distance_to(target) < 1 {
@@ -609,6 +805,7 @@ experiment Festival type: gui {
 
 			species Stage;
 			species ChillArea;
+			species TinderArea;
 			species Bar;
 			species Table;
 			
