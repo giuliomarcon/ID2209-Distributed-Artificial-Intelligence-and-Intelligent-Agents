@@ -21,13 +21,18 @@ global {
 	point BarLocation <- {50,50};
 	point securityLocation <- {3,50};
 	
+	// Threshold at which the bartender will call the security
+	float drunknesThreshold <-0.9;
+	// number of iterations guest have to talk for
+	int WAITING_ITERATIONS <- 50;
+	
 	int tablePerRow <- 5;
 	point tableInitialPosion <- {10, 10};
 	list<point> tablePositions;
 	list<bool> tableBookings;
 	//ture table booked, false not
 	
-	int  tableNumber <-20;
+	int  tableNumber <-15;
 	
 	float communicationIncreasigFactor <- 0.1;
 	
@@ -35,21 +40,25 @@ global {
 		//init table positions
 		point tablePosion <- tableInitialPosion;
 		
-		loop i from: 1 to: tableNumber { 
-			add tableInitialPosion to:tablePositions;
+		loop i from: 0 to: (tableNumber-1) { 
 			if ((i mod tablePerRow) = 0 and i>1){
 				tablePosion <-  tableInitialPosion + {(i/tablePerRow)*tableRadius*4.5,0};
-			}else if ( i>1){
+				
+			}else if ( i>=1){
 				tablePosion <- tablePosion + {0, tableRadius*2.5};
 			}
 			
+			add tablePosion to:tablePositions;
 			add false to:tableBookings;
 			
 			create Table number:1 {
-				location <- tablePosion;
+				//location <- tablePosion;
+				location <- tablePositions[i];
 			}
 			
 		}
+		
+		write tablePositions;
 		
 		create Entrance number: 1{
 			location <-EntranceLocation;
@@ -94,7 +103,7 @@ global {
 species Guest  skills:[moving,fipa]{
 	rgb guestColor <- #red;	
 	point targetPoint <- nil;
-
+	
 	int neighbouDistance <- 10;
 
 	// Treats
@@ -112,8 +121,10 @@ species Guest  skills:[moving,fipa]{
 	float thirstyTrashold <- 1.0;
 
 	int status<-3;
-
-	int tableUsedIndex;
+	
+	int currentWaitingIteration <-0;
+	
+	int tableUsedIndex<- -1;
 	message tableConversationMessage ;
 	/*
 	 * 0: want to drink
@@ -130,6 +141,8 @@ species Guest  skills:[moving,fipa]{
 	 * 11: guests received approach in the tinderArea, evaluating partner
 	 * 12: approcher (tinder) goinig to booked table
 	 * 13: approcher (tinder) reached to booked table
+	 * 
+	 * 99: waiting ('talking') at the table, then go to tatus 3
 	 */
 	
 	reflex moveToTarget when: targetPoint != nil {
@@ -151,11 +164,12 @@ species Guest  skills:[moving,fipa]{
 //		write name+ "ask the menu:"+thirsty color:#blue;
 //	}
 
-	reflex logTreats when:false{
+	reflex logTreats  when:false{
 		write "drunkness:"+drunkness +" thirsty:"+thirsty+ " status:"+status +" love:"+love;
+		write tableBookings;
 	}
 	
-	reflex updateLove when: true{
+	reflex updateLove when:  status = 4{
 		love<-love+rnd(0.0,0.008);
 	}
 	
@@ -202,7 +216,7 @@ species Guest  skills:[moving,fipa]{
 		status <-3;
 	}
 	
-	reflex imDrunk when:drunkness>=1{
+	reflex imDrunk when:drunkness>=drunknesThreshold{
 		//write name+"sono sbronzo!" color:#red;
 	}
 	
@@ -231,7 +245,7 @@ species Guest  skills:[moving,fipa]{
     	status <-0;
     }
     reflex goToTinder when:status  = 3 and love >= loveTrashold {
-    	write name+"trashold reached";
+    	//write name+"trashold reached";
     	love<-0.0;
     	targetPoint<-TinderLocation;
     	status <-8;
@@ -266,10 +280,11 @@ species Guest  skills:[moving,fipa]{
     		status <- 6;
     		tableConversationMessage <- m;
     	}else{
-    		write name + " recived failed approach";
+    		//write name + " recived failed approach";
 			do end_conversation message:m contents:[];
 			
 			//unbook table
+			//write("mate reply unbook table");
     		int bookedTableNumber <- int(m.contents[1]);
     		tableBookings[bookedTableNumber]<-false;
     		
@@ -305,8 +320,8 @@ species Guest  skills:[moving,fipa]{
     		
 	    	//write name+" -> "+potentialMate +"lets go to table "+tableIndex color:#darkgreen;
     		
-    		point myPosition <- tablePositions[tableIndex]-{tableRadius,0}+{0,2*tableRadius};
-    		point partnerPosition <- tablePositions[tableIndex]+{tableRadius,0}+{0,2*tableRadius};
+    		point myPosition <- tablePositions[tableIndex]-{tableRadius,0};//+{0,2*tableRadius};
+    		point partnerPosition <- tablePositions[tableIndex]+{tableRadius,0};//+{0,2*tableRadius};
     		
     		//comunicating where to go
     		tableUsedIndex<-tableIndex;
@@ -320,11 +335,17 @@ species Guest  skills:[moving,fipa]{
     //receive inform message by other guest, but i'm already busy talking
     reflex receivedApproachFailed when:(status!=4 and status!=10 and status!=8 ) and !empty(informs) {//and list(Guest) contains informs[0].sender{
     	message m<- informs[0];
-    	write "ocio:"+m ;
-    	tableUsedIndex <- int(m.contents[2]);
-		write name+" sorry "+m.sender+" i'm already busy (status:"+status+")";
-		//write "proposed table:"+tableUsedIndex;
-		do inform message:m contents:[false,tableUsedIndex];
+    	//TODO sistemare bug
+    	if(length(m)<2){
+    		// we should not get inside here!!
+    		write "ocio:"+m ;
+    	}else{
+	    	tableUsedIndex <- int(m.contents[2]);
+			//write name+" sorry "+m.sender+" i'm already busy (status:"+status+")";
+			//write "proposed table:"+tableUsedIndex;
+			do inform message:m contents:[false,tableUsedIndex];
+			
+		}
 		
     }
     
@@ -380,11 +401,9 @@ species Guest  skills:[moving,fipa]{
 		
 		
     	//write name+"sent info about the outcome of the conversation " + m.contents[0] + "go back to previous activity";
-    	//go back to previous activity
-    	status <-3;
+    	//waiting for a wgile at the table before go back to previous activity
+    	status <-99;
     	
-    	//unbook tabels
-    	tableBookings[tableUsedIndex]<- false;
   	}
     
     //received info about the outcome of the conversation
@@ -395,14 +414,14 @@ species Guest  skills:[moving,fipa]{
     	
     	//write name+"received info about the outcome of the conversation " + m.contents[0] + "go back to previous activity";
     	
-    	//go back to previous activity
-    	status <-3;
+    	//waiting for a wgile at the table before go back to previous activity
+    	status <-99;
     }
     
     // REached TinderArea, looking for a soul mate
     reflex lookingForSoulMate when:status=8 and location distance_to(TinderLocation)<5 and tableBookings contains(false){
     	//status<-9;
-    	write name+" reached tinderArea";
+    	//write name+" reached tinderArea";
     	list<Guest> neighbourGuests;
     	list<Guest> ChillneighbourGuests <- (ChillGuest at_distance neighbouDistance);
     	list<Guest> PartyneighbourGuests <- (PartyGuest at_distance neighbouDistance);
@@ -413,9 +432,9 @@ species Guest  skills:[moving,fipa]{
     	
     	neighbourGuests<-shuffle(neighbourGuests);
     	if(flip(talkative/30) and length(neighbourGuests)>0){
-    		write name+" in  tinderArea there are:"+length(neighbourGuests)+" potential mates" color:#red;
+    		//write name+" in  tinderArea there are:"+length(neighbourGuests)+" potential mates" color:#red;
     		Guest potentialMate <- neighbourGuests[0];
-	    	write name+" in  tinderArea  found "+potentialMate color:#darkgreen;
+	    	//write name+" in  tinderArea  found "+potentialMate color:#darkgreen;
 	    	
     		bool tableStatus <- false;
     		
@@ -424,10 +443,10 @@ species Guest  skills:[moving,fipa]{
     		tableBookings[tableIndex]<-true;
     		
     		
-	    	write name+"[in  tinderArea ]-> "+potentialMate +"lets go to table "+tableIndex color:#darkgreen;
+	    	//write name+"[in  tinderArea ]-> "+potentialMate +"lets go to table "+tableIndex color:#darkgreen;
     		
-    		point myPosition <- tablePositions[tableIndex]-{tableRadius,0}+{0,2*tableRadius};
-    		point partnerPosition <- tablePositions[tableIndex]+{tableRadius,0}+{0,2*tableRadius};
+    		point myPosition <- tablePositions[tableIndex]-{tableRadius,0};
+    		point partnerPosition <- tablePositions[tableIndex]+{tableRadius,0};
     		
     		//comunicating where to go
     		tableUsedIndex<-tableIndex;
@@ -435,7 +454,7 @@ species Guest  skills:[moving,fipa]{
     		do start_conversation to: list(potentialMate) protocol: 'fipa-contract-net' performative: 'inform' contents: [partnerPosition,myPosition,tableIndex] ;
     		status <- 10;
     	}else{
-    		write name+" waiting inthe tinderArea status:"+status color:#lightblue;
+    		//write name+" waiting inthe tinderArea status:"+status color:#lightblue;
     	}
     	
     }
@@ -446,7 +465,7 @@ species Guest  skills:[moving,fipa]{
     	message m<- informs[0];
 		targetPoint<-m.contents[1];
 		point matePoint<-m.contents[0];
-		write name+": "+m.sender+" approached me in  tinderArea , going to point:"+targetPoint color:#blue;
+		//write name+": "+m.sender+" approached me in  tinderArea , going to point:"+targetPoint color:#blue;
 		do inform message:m contents:[true,matePoint];
 		status <- 11;
     }
@@ -464,7 +483,7 @@ species Guest  skills:[moving,fipa]{
     		status <- 12;
     		tableConversationMessage <- m;
     	}else{
-    		write name + " recived failed approach";
+    		//write name + " recived failed approach";
 			do end_conversation message:m contents:[];
 			
 			//unbook table
@@ -488,7 +507,7 @@ species Guest  skills:[moving,fipa]{
 		float c2dApprocherExtreme <- float(m.contents[0]); 
 		float c2dExtreme <- chill2dance;
 		
-		write name+ " evauleting tinder mate C2D of"+m.sender;
+		//write name+ " evauleting tinder mate C2D of"+m.sender;
 		if(c2dApprocherExtreme > 0.5){
 			c2dApprocherExtreme <- 1 - c2dApprocherExtreme;	
 		}
@@ -517,12 +536,11 @@ species Guest  skills:[moving,fipa]{
 		}
 		
 		
-    	write name+"sent info about TINDER the outcome of the conversation " + m.contents[0] + "go back to previous activity" color:#purple;
-    	//go back to previous activity
-    	status <-3;
-    	
+    	//write name+"sent info about TINDER the outcome of the conversation " + m.contents[0] + "go back to previous activity" color:#purple;
+    	//waiting for a wgile at the table before go back to previous activity
+    	status <-99;
     	//unbook tabels
-    	tableBookings[tableUsedIndex]<- false;
+    	//tableBookings[tableUsedIndex]<- false;
   	}
         
     //received info about the outcome of the Tinder conversation
@@ -531,13 +549,32 @@ species Guest  skills:[moving,fipa]{
     	chill2dance <- chill2dance + float(m.contents[0]);
     	// TODO end_conversation
     	
-    	write name+"received info about the TINDER outcome of the conversation " + m.contents[0] + "go back to previous activity" color:#violet;
+    	//write name+"received info about the TINDER outcome of the conversation " + m.contents[0] + "go back to previous activity" color:#violet;
     	
-    	//go back to previous activity
-    	status <-3;
+    //waiting for a wgile at the table before go back to previous activity
+    	status <-99;
     }
         //received info about the outcome of the conversation
 
+	reflex waitBeforeGoingToPreviousActivity when: status = 99 and currentWaitingIteration <= WAITING_ITERATIONS{
+		if(currentWaitingIteration >= WAITING_ITERATIONS){
+		//go back to previous activit
+    		status <-3;
+    		currentWaitingIteration <- 0;		
+    		//unbook tabels
+			write("leaving the table, unbooking");
+			
+			if(tableUsedIndex!=-1){
+	    		tableBookings[tableUsedIndex]<- false;
+	    		tableUsedIndex <- -1;
+    		}
+    		
+    	}else{
+    		currentWaitingIteration <-	currentWaitingIteration + 1;
+    		
+    	}
+    	
+	}
     
  
     reflex logStatus when:false {
@@ -633,6 +670,10 @@ species PartyGuest parent: Guest{
 		
 	}
 	
+	reflex logdrunkness when:false{
+		write "drunkness:"+drunkness;
+	}
+	
 	
    aspect default{
        	draw cone3D(1.3,2.3) at: location color: #slategray ;
@@ -676,7 +717,7 @@ species Bar skills:[fipa]{
 	//int height <- 10;
 	int height <- 0;
 	
-	float drunknesThreshold <- 0.4;
+	
 	
 	list<string> beverages  		<- ['Grappa', 'Montenegro', 'Beer', 'Wine','Soda', 'Cola', 'Juice', 'Julmust'];
 	list<float> alchoolPercentage 	<- [	0.4, 	0.23, 		0.05, 	0.12,	0.0, 	0.0, 	0.0, 	0.0];
@@ -773,6 +814,7 @@ species Security skills:[moving, fipa]{
 		write "status:"+status;
 	}
 	
+
 }
 
 species Entrance{
@@ -813,5 +855,16 @@ experiment Festival type: gui {
 			species PartyGuest;
 			species Security;
 		}
+		
+		 display "my_display" {
+        chart "my_chart" type: histogram {
+        
+        //TODO perché non va con la classe pafre guest?
+        //we display the drunkness of agent Guest in 20 ranges computed among the ages between 0 and drunknesThreshold.
+        datalist (distribution_of(PartyGuest collect each.drunkness,20,0,drunknesThreshold) at "legend") 
+            value:(distribution_of(PartyGuest collect each.drunkness,20,0,drunknesThreshold) at "values");      
+        
+        }
+    }
 	}
 }
