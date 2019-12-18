@@ -84,7 +84,7 @@ global {
 				location <- BarLocation;
 		}
 		
-		create ChillGuest number: 5{
+		create ChillGuest number: 4{
 				location <- {rnd(50-10,50+10),rnd(50-10,50+10)};
 				if(flip(0.5)){
 					gender<-'M';
@@ -92,7 +92,7 @@ global {
 					gender<-'F';
 				}
 		}
-		create PartyGuest number: 5 {
+		create PartyGuest number: 0 {
 				location <- {rnd(50-10,50+10),rnd(50-10,50+10)};
 		}
 		create Security number: 1 {

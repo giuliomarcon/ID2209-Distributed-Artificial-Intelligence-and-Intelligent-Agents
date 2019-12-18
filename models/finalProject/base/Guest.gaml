@@ -178,31 +178,7 @@ species Guest  skills:[moving,fipa]{
     }
     
 
-    
-    reflex mateReply when:status=5 and !empty(informs){
-    	message m<-informs[0];
-    	bool approchSuccess <- bool(m.contents[0]);
-    
-    	if(approchSuccess)	{
-    		//going to the table
-    		//write name + " approach suceed message";
-    		point myPosition <- m.contents[1];
-    		targetPoint<-myPosition;
-    		status <- 6;
-    		tableConversationMessage <- m;
-    	}else{
-    		//write name + " recived failed approach";
-			do end_conversation message:m contents:[];
-			
-			//unbook table
-			//write("mate reply unbook table");
-    		int bookedTableNumber <- int(m.contents[1]);
-    		tableBookings[bookedTableNumber]<-false;
-    		
-    		status <- 4;
-    	}
-    }
-    
+      
  
     
     reflex lookingForMate when:status=4 and location distance_to(ChillLocation)<5 and tableBookings contains(false){
@@ -244,20 +220,45 @@ species Guest  skills:[moving,fipa]{
     }
     
     //receive inform message by other guest, but i'm already busy talking
-    reflex receivedApproachFailed when:(status!=4 and status!=10 and status!=8 ) and !empty(informs) {//and list(Guest) contains informs[0].sender{
+
+    reflex receivedApproachFailed when: !([4,5,8,10] contains status) and !empty(informs) {//and list(Guest) contains informs[0].sender{
     	message m<- informs[0];
-    	//TODO sistemare bug
-    	if(length(m)<2){
-    		// we should not get inside here!!
-    		write "ocio:"+m ;
-    	}else{
-	    	tableUsedIndex <- int(m.contents[2]);
+    	list<unknown> messageContents <-  m.contents;
+    	
+    	//if(length(messageContents)=3)
+    	if(true)
+    	{
+	    	tableUsedIndex <- int(messageContents[2]);
 			//write name+" sorry "+m.sender+" i'm already busy (status:"+status+")";
 			//write "proposed table:"+tableUsedIndex;
 			do inform message:m contents:[false,tableUsedIndex];
-			
 		}
 		
+    }
+    
+    // approched guest reply if he is ok to talk or not
+    reflex mateReply when:status=5 and !empty(informs){
+    	message m<-informs[0];
+    	bool approchSuccess <- bool(m.contents[0]);
+    
+    	if(approchSuccess)	{
+    		//going to the table
+    		//write name + " approach suceed message";
+    		point myPosition <- m.contents[1];
+    		targetPoint<-myPosition;
+    		status <- 6;
+    		tableConversationMessage <- m;
+    	}else{
+    		//write name + " recived failed approach";
+			
+			//unbook table
+			//write("mate reply unbook table");
+    		int bookedTableNumber <- int(m.contents[1]);
+    		tableBookings[bookedTableNumber]<-false;
+    		
+			do end_conversation message:m contents:[];
+    		status <- 4;
+    	}
     }
     
     //receive inform message by other guest
@@ -270,7 +271,7 @@ species Guest  skills:[moving,fipa]{
 		status <- 7;
     }
     
-    //approching guest says its chill2dance vale
+    //approching guest says its chill2dance value
   	reflex rechedTable when: status=6 and location distance_to(targetPoint)<2 {
   		do cfp message:tableConversationMessage contents:[chill2dance];
   		status <-7;
@@ -488,7 +489,7 @@ species Guest  skills:[moving,fipa]{
 	}
     
  
-    reflex logStatus when:false {
+    reflex logStatus when:true {
     	write name + "status:"+status;
     }
 
@@ -544,6 +545,8 @@ species ChillGuest parent: Guest{
    	aspect default{
        	draw cone3D(1.3,2.3) at: location color: #slategray ;
     	draw sphere(0.7) at: location + {0, 0, 2} color: #blue ;
+    	
+        draw " "+name+" S: "+status  color: #black size: 15; 
     }
 }
 
