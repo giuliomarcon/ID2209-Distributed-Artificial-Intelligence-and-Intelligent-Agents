@@ -171,7 +171,7 @@ species Guest  skills:[moving,fipa]{
     	status <-8;
     }
     
-    reflex arrivedAtdanceFloor when:status = 3 and (location distance_to(StageLocation)<5 or location distance_to(ChillLocation)<5) {
+    reflex arrivedAtDanceFloor when:status = 3 and (location distance_to(StageLocation)<5 or location distance_to(ChillLocation)<5) {
     	status <- 4;
     }
      
@@ -282,7 +282,7 @@ species Guest  skills:[moving,fipa]{
     }
     
     //approching guest says its chill2dance value
-  	reflex rechedTable when: status=6 and location distance_to(targetPoint)<2 {
+  	reflex reachedTable when: status=6 and location distance_to(targetPoint)<2 {
   		do cfp message:tableConversationMessage contents:[chill2dance];
   		status <-7;
   	}
@@ -341,7 +341,7 @@ species Guest  skills:[moving,fipa]{
     	status <-99;
     }
     
-    // REached TinderArea, looking for a soul mate
+    // Reached TinderArea, looking for a soul mate
     reflex lookingForSoulMate when:status=8 and location distance_to(TinderLocation)<5 and tableBookings contains(false){
     	//status<-9;
     	//write name+" reached tinderArea";
