@@ -50,7 +50,7 @@ species Table{
 		draw circle(tableRadius) at: location color: #green;
 	}
 	
-	reflex logAgents{
+	reflex logAgents when: false{
 		list<Guest> l <-PartyGuest at_distance (tableRadius*4);
 		
 		write "["+name+"]:" color:#gold;

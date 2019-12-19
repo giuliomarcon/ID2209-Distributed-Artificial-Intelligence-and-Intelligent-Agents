@@ -14,11 +14,15 @@ species Bar skills:[fipa]{
 	int length <- 10;
 	//int height <- 10;
 	int height <- 0;
-	
-	
-	
+	int minB <- 10;
+	int maxB <- 30;
+
 	list<string> beverages  		<- ['Grappa', 'Montenegro', 'Beer', 'Wine','Soda', 'Cola', 'Juice', 'Julmust'];
 	list<float> alchoolPercentage 	<- [	0.4, 	0.23, 		0.05, 	0.12,	0.0, 	0.0, 	0.0, 	0.0];
+	list<int> beverageSupply		<- [rnd(minB, maxB), rnd(minB, maxB), rnd(minB, maxB), rnd(minB, maxB), 
+										rnd(minB, maxB), rnd(minB, maxB), rnd(minB, maxB), rnd(minB, maxB)];
+										
+//	list<int> beverageSupply		<- [2, 2, 2, 2, 2, 2, 2, 2];
 //	list<string> beverages  		<- ['Grappa', 'Montenegro', 'Beer', 'Wine','Soda', 'Cola', 'Juice', 'Julmust'];
 //	list<float> alchoolPercentage 	<- [	0.9, 	0.93, 		0.95, 	0.92,	0.9, 	0.9, 	0.9, 	0.9];
 //	
@@ -31,7 +35,7 @@ species Bar skills:[fipa]{
 		if(userDrunkness>=drunknesThreshold){
 			//write "reporting "+g + "is drunk";
 			//write "location of "+g + "is"+g.location;
-			do start_conversation to: list(Security) protocol: 'fipa-contract-net' performative: 'inform' contents: [g] ;
+			do start_conversation to: list(Security) protocol: 'fipa-contract-net' performative: 'inform' contents: [g];
 		}
 		// guest not drunk, provide menu
 		else{
@@ -50,10 +54,37 @@ species Bar skills:[fipa]{
 	
 	reflex serveDrink when:!empty(accept_proposals){
 		message m <- accept_proposals[0];
-		do inform message:m contents:[alchoolPercentage[int(m.contents[0])]];
+		int beverageIndex <- int(m.contents[0]);
+		
+		if (beverageSupply[beverageIndex] > 0){
+			do inform message:m contents:[alchoolPercentage[beverageIndex]];
+		
+			beverageSupply[beverageIndex] <- beverageSupply[beverageIndex] - 1;
+			
+			if (beverageSupply[beverageIndex] <= 0){
+				do start_conversation to: list(Supplier) protocol: 'fipa-contract-net' performative: 'inform' contents: [beverageIndex];
+			}
+		} else {
+			//TODO fix response
+			do inform message:m contents:[alchoolPercentage[6]];
+		}
+		
+		
+	}
+	
+	reflex restockBeverages when: !empty(agrees){
+		message m <- agrees[0];
+		beverageSupply[int(m.contents[0])] <- beverageSupply[int(m.contents[0])] + int(m.contents[1]);
+		
+		do end_conversation message:m contents:[];
+		
 	}
 	aspect default{
 		draw box(width, length, height) at: location color: myColor;
+	}
+	
+	reflex log when: false{
+		write beverageSupply color: #red;
 	}
 }
 
