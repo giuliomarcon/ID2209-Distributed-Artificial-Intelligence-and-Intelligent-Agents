@@ -17,7 +17,7 @@ species ATM skills:[fipa]{
 	}
 	
 	aspect default{
-		draw cube(10) at:location color: #gold;
+		draw cone3D(5, 10) at:location color: #gold;
 	}
 	
 }

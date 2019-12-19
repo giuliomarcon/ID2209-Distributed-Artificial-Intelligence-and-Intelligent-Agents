@@ -81,6 +81,7 @@ species Bar skills:[fipa]{
 	}
 	aspect default{
 		draw box(width, length, height) at: location color: myColor;
+		draw "BAR" color: #black anchor: #center font: font('Default', 30, #bold); 
 	}
 	
 	reflex log when: false{

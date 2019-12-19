@@ -24,7 +24,7 @@ global {
 	point BarLocation <- {50, 50};
 	point securityLocation <- {3, 50};
 	point supplierLocation <- {50, 3};
-	point ATMLocation <- {50, 90};
+	point ATMLocation <- {50, 95};
 
 	// Threshold at which the bartender will call the security
 	float drunknesThreshold <- 0.9;

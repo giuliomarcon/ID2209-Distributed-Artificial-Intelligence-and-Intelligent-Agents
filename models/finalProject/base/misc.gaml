@@ -17,6 +17,11 @@ species Stage{
 	
 	aspect default{
 		draw square(30) at: location color: myColor;
+		draw cylinder(1,10) at: location + {14, 14, 0} color: myColor;
+		draw cylinder(1,10) at: location + {-14, 14, 0} color: myColor;
+		draw cylinder(1,10) at: location + {14, -14, 0} color: myColor;
+		draw cylinder(1,10) at: location + {-14, -14, 0} color: myColor;
+		draw sphere(3) at: location + {0, 0, 13} color: myColor;
 	}
 }
 
@@ -47,7 +52,8 @@ species Entrance{
 species Table{
 	
 	aspect default{
-		draw circle(tableRadius) at: location color: #green;
+		draw cylinder(0.5,1.7) at: location color: #burlywood;
+		draw cylinder(tableRadius, 0.4) at: location+{0,0,1.7} color: #burlywood;
 	}
 	
 	reflex logAgents when: false{
