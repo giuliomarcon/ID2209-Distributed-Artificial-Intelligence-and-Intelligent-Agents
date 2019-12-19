@@ -10,6 +10,7 @@ import "Guest.gaml"
 import "Security.gaml"
 import "Bar.gaml"
 import "Supplier.gaml"
+import "ATM.gaml"
 import "misc.gaml"
 
 global {
@@ -23,6 +24,7 @@ global {
 	point BarLocation <- {50, 50};
 	point securityLocation <- {3, 50};
 	point supplierLocation <- {50, 3};
+	point ATMLocation <- {50, 90};
 
 	// Threshold at which the bartender will call the security
 	float drunknesThreshold <- 0.9;
@@ -91,6 +93,10 @@ global {
 		create Supplier number: 1 {
 			location <- supplierLocation;
 		}
+		
+		create ATM number: 1 {
+			location <- ATMLocation;
+		}
 
 	}
 
@@ -126,6 +132,7 @@ experiment Festival type: gui {
 			species ChillGuest;
 			species PartyGuest;
 			species Security;
+			species ATM;
 		}
 
 		//TODO: all'inizio non va perché non c'è nessuno
