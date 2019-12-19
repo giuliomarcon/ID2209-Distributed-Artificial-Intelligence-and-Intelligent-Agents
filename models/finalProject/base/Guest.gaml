@@ -37,6 +37,7 @@ species Guest  skills:[moving,fipa]{
 	
 	int tableUsedIndex<- -1;
 	message tableConversationMessage ;
+	point myTablePosition;
 	/*
 	 * 0: want to drink
 	 * 1: asked menu
@@ -55,6 +56,13 @@ species Guest  skills:[moving,fipa]{
 	 * 
 	 * 99: waiting ('talking') at the table, then go to tatus 3
 	 */
+	init {
+		if(flip(0.5)){
+			gender<-'M';
+		}else{
+			gender<-'F';
+		}
+	}
 	
 	reflex moveToTarget when: targetPoint != nil {
 		do goto target:targetPoint;
@@ -136,8 +144,9 @@ species Guest  skills:[moving,fipa]{
 	}
 	
 	reflex dance when: status = 4{
+		float length<-10.0;
 		if (flip (chill2dance) = true){
-			do wander;
+			do wander bounds: square(length) ;
 		}
 	}
 	
@@ -207,13 +216,13 @@ species Guest  skills:[moving,fipa]{
     		
 	    	//write name+" -> "+potentialMate +"lets go to table "+tableIndex color:#darkgreen;
     		
-    		point myPosition <- tablePositions[tableIndex]-{tableRadius,0};//+{0,2*tableRadius};
+    		myTablePosition <- tablePositions[tableIndex]-{tableRadius,0};//+{0,2*tableRadius};
     		point partnerPosition <- tablePositions[tableIndex]+{tableRadius,0};//+{0,2*tableRadius};
     		
     		//comunicating where to go
     		tableUsedIndex<-tableIndex;
     		
-    		do start_conversation to: list(potentialMate) protocol: 'fipa-contract-net' performative: 'inform' contents: [partnerPosition,myPosition,tableIndex] ;
+    		do start_conversation to: list(potentialMate) protocol: 'fipa-contract-net' performative: 'inform' contents: [partnerPosition,myTablePosition,tableIndex] ;
     		status <- 5;
     	}
     	
@@ -224,15 +233,16 @@ species Guest  skills:[moving,fipa]{
     reflex receivedApproachFailed when: !([4,5,8,10] contains status) and !empty(informs) {//and list(Guest) contains informs[0].sender{
     	message m<- informs[0];
     	list<unknown> messageContents <-  m.contents;
-    	
-    	//if(length(messageContents)=3)
-    	if(true)
-    	{
+    	if(length(messageContents)=3){
 	    	tableUsedIndex <- int(messageContents[2]);
-			//write name+" sorry "+m.sender+" i'm already busy (status:"+status+")";
-			//write "proposed table:"+tableUsedIndex;
+	
 			do inform message:m contents:[false,tableUsedIndex];
+		
+		}else{
+			write m color:#red;
+			write name+ " s:"+status color:#red;
 		}
+		
 		
     }
     
@@ -244,8 +254,8 @@ species Guest  skills:[moving,fipa]{
     	if(approchSuccess)	{
     		//going to the table
     		//write name + " approach suceed message";
-    		point myPosition <- m.contents[1];
-    		targetPoint<-myPosition;
+    		myTablePosition <- m.contents[1];
+    		targetPoint<-myTablePosition;
     		status <- 6;
     		tableConversationMessage <- m;
     	}else{
@@ -299,6 +309,7 @@ species Guest  skills:[moving,fipa]{
 			}else{
 				chill2dance <- chill2dance - communicationIncreasigFactor;
 			}
+			
 			do propose  message:m contents:[0];
 			
 			
@@ -319,7 +330,7 @@ species Guest  skills:[moving,fipa]{
   	}
     
     //received info about the outcome of the conversation
-    reflex gotProposal when: !empty(proposes) and status = 7 {
+    reflex gotProposal when: status = 7 and !empty(proposes)  {
     	message m <- proposes[0];
     	chill2dance <- chill2dance + float(m.contents[0]);
     	// TODO end_conversation
@@ -348,25 +359,28 @@ species Guest  skills:[moving,fipa]{
     		Guest potentialMate <- neighbourGuests[0];
 	    	//write name+" in  tinderArea  found "+potentialMate color:#darkgreen;
 	    	
-    		bool tableStatus <- false;
-    		
-    		//booking table 
-    		int tableIndex <-index_of(tableBookings,tableStatus);
+	    	
+	    	int tableIndex <- rnd (0,tableNumber-1);
+		    
+		    loop while: tableBookings[tableIndex] { 
+	    		tableIndex <- rnd (0,tableNumber-1);
+			}
+	    	
     		tableBookings[tableIndex]<-true;
     		
     		
 	    	//write name+"[in  tinderArea ]-> "+potentialMate +"lets go to table "+tableIndex color:#darkgreen;
     		
-    		point myPosition <- tablePositions[tableIndex]-{tableRadius,0};
+    		myTablePosition <- tablePositions[tableIndex]-{tableRadius,0};
     		point partnerPosition <- tablePositions[tableIndex]+{tableRadius,0};
     		
     		//comunicating where to go
     		tableUsedIndex<-tableIndex;
     		
-    		do start_conversation to: list(potentialMate) protocol: 'fipa-contract-net' performative: 'inform' contents: [partnerPosition,myPosition,tableIndex] ;
+    		do start_conversation to: list(potentialMate) protocol: 'fipa-contract-net' performative: 'inform' contents: [partnerPosition,myTablePosition,tableIndex] ;
     		status <- 10;
     	}else{
-    		//write name+" waiting inthe tinderArea status:"+status color:#lightblue;
+    		write name+" waiting inthe tinderArea status:"+status color:#lightblue;
     	}
     	
     }
@@ -390,8 +404,8 @@ species Guest  skills:[moving,fipa]{
     	if(approchSuccess)	{
     		//going to the table
     		//write name + " approach suceed message";
-    		point myPosition <- m.contents[1];
-    		targetPoint<-myPosition;
+    		myTablePosition <- m.contents[1];
+    		targetPoint<-myTablePosition;
     		status <- 12;
     		tableConversationMessage <- m;
     	}else{
@@ -406,11 +420,12 @@ species Guest  skills:[moving,fipa]{
     	}
     }
     
-    //approching tinder guest says its chill2dance vale
+    //approching tinder guest says its chill2dance value
   	reflex rechedTinderTable when: status=12 and location distance_to(targetPoint)<2 {
   		do cfp message:tableConversationMessage contents:[chill2dance];
   		status <-13;
   	}
+  	
   	
     //approched guest receive chill2dance of approcher
   	reflex getTinderC2D when: status = 11 and !empty(cfps){
@@ -455,6 +470,12 @@ species Guest  skills:[moving,fipa]{
     	//tableBookings[tableUsedIndex]<- false;
   	}
         
+   	reflex 	NotegetTinderC2D when: status = 11 and targetPoint =  nil {
+   		write "something went wrong";
+   		love<-0.0;
+   		status<-3;
+   	}
+   
     //received info about the outcome of the Tinder conversation
     reflex gotTinderDateOutcome when: !empty(proposes) and status =13 {
     	message m <- proposes[0];
@@ -493,11 +514,7 @@ species Guest  skills:[moving,fipa]{
     	write name + "status:"+status;
     }
 
-    //on the exit square
-    reflex exitFestival when: location distance_to(ExitLocation)<1{
-    	do die;
-    }
-    
+
     
     aspect default{
        	draw cone3D(1.3,2.3) at: location color: #slategray ;
@@ -518,8 +535,12 @@ species ChillGuest parent: Guest{
 	}
 	
 	reflex updateC2D when: status=4{
+		/*
+		 * we use increasing beacuse in this way c2d will monotonically increase until 1, then it will monotonically decrese until 0.01,
+		 * This is done to avoid rapid changeing behaviour
+		 */
 		if(increasingC2D ){
-			float incresingStep <- rnd(0.0,0.0002);
+			float incresingStep <- rnd(0.02,0.04);
 			
 			if ((incresingStep + chill2dance)<= 1){
 				chill2dance <- chill2dance + incresingStep;
@@ -530,7 +551,7 @@ species ChillGuest parent: Guest{
 		}else{
 			float decresingStep <- rnd(0.0,0.002);
 			
-			if ((chill2dance-decresingStep)>= 0){
+			if ((chill2dance-decresingStep)>= 0.01){
 				chill2dance <- chill2dance - decresingStep;
 			}else{
 				increasingC2D <-true;
@@ -540,13 +561,18 @@ species ChillGuest parent: Guest{
 		
 	}
 		
-		
+    //on the exit square
+    reflex exitFestival when: location distance_to(ExitLocation)<1{
+    	numberOfChill <-numberOfChill-1;
+    	
+    	do die;
+    }
+    
 		
    	aspect default{
        	draw cone3D(1.3,2.3) at: location color: #slategray ;
     	draw sphere(0.7) at: location + {0, 0, 2} color: #blue ;
     	
-        draw " "+name+" S: "+status  color: #black size: 15; 
     }
 }
 
@@ -561,7 +587,7 @@ species PartyGuest parent: Guest{
 	
 	reflex updateC2D when: status=4{
 		if(increasingC2D ){
-			float incresingStep <- rnd(0.0,0.002);
+			float incresingStep <- rnd(0.001,0.005);
 			
 			if ((incresingStep + chill2dance)<= 1){
 				chill2dance <- chill2dance + incresingStep;
@@ -572,7 +598,7 @@ species PartyGuest parent: Guest{
 		}else{
 			float decresingStep <- rnd(0.0,0.0002);
 			
-			if ((chill2dance-decresingStep)>= 0){
+			if ((chill2dance-decresingStep)>= 0.01){
 				chill2dance <- chill2dance - decresingStep;
 			}else{
 				increasingC2D <-true;
@@ -588,10 +614,24 @@ species PartyGuest parent: Guest{
 		write "drunkness:"+drunkness;
 	}
 	
+			
+    //on the exit square
+    reflex exitFestival when: location distance_to(ExitLocation)<1{
+    	numberOfParty <-numberOfParty-1;
+    	
+    	do die;
+    }
+    
 	
    aspect default{
        	draw cone3D(1.3,2.3) at: location color: #slategray ;
     	draw sphere(0.7) at: location + {0, 0, 2} color: #red ;
+    	
+
+   
     }
+    
+
+
 }
 

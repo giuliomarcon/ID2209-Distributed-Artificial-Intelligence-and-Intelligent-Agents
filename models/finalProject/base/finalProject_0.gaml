@@ -35,6 +35,12 @@ global {
 	list<bool> tableBookings;
 	//ture table booked, false not
 	
+	int numberOfChill<-0;
+	int maxChill <- 20;
+	
+	int numberOfParty<-0;
+	int maxParty <-20;
+	
 	int  tableNumber <-15;
 	
 	float communicationIncreasigFactor <- 0.1;
@@ -84,23 +90,28 @@ global {
 				location <- BarLocation;
 		}
 		
-		create ChillGuest number: 4{
-				location <- {rnd(50-10,50+10),rnd(50-10,50+10)};
-				if(flip(0.5)){
-					gender<-'M';
-				}else{
-					gender<-'F';
-				}
-		}
-		create PartyGuest number: 0 {
-				location <- {rnd(50-10,50+10),rnd(50-10,50+10)};
-		}
+		
 		create Security number: 1 {
 				location <- securityLocation;
 		}
 		
 	}
+
+	   
 	
+	reflex spawnChillGuest when: numberOfChill<maxChill{
+		create ChillGuest number: 1{
+			location <- EntranceLocation;
+		}
+		numberOfChill <- numberOfChill +1;
+	}	
+	
+	reflex spawnPartyGuest when: numberOfParty<maxParty{
+		create PartyGuest number: 1{
+			location <- EntranceLocation;
+		}
+		numberOfParty <- numberOfParty +1;
+	}
 }
 
 
@@ -120,17 +131,19 @@ experiment Festival type: gui {
 			species ChillGuest;
 			species PartyGuest;
 			species Security;
+			
 		}
 		
-		 display "my_display" {
-        chart "my_chart" type: histogram {
-        
-        //TODO perché non va con la classe pafre guest?
-        //we display the drunkness of agent Guest in 20 ranges computed among the ages between 0 and drunknesThreshold.
-        datalist (distribution_of(PartyGuest collect each.drunkness,20,0,drunknesThreshold) at "legend") 
-            value:(distribution_of(PartyGuest collect each.drunkness,20,0,drunknesThreshold) at "values");      
-        
-        }
-    }
+		//TODO: all'inizio non va perché non c'è nessuno
+//		 display "my_display" {
+//        chart "my_chart" type: histogram {
+//        
+//        //TODO perché non va con la classe pafre guest?
+//        //we display the drunkness of agent Guest in 20 ranges computed among the ages between 0 and drunknesThreshold.
+//        datalist (distribution_of(PartyGuest collect each.drunkness,20,0,drunknesThreshold) at "legend") 
+//            value:(distribution_of(PartyGuest collect each.drunkness,20,0,drunknesThreshold) at "values");      
+//        
+//        }
+//    }
 	}
 }

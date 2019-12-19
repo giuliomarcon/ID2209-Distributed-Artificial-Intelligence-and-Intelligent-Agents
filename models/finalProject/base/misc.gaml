@@ -49,6 +49,33 @@ species Table{
 	aspect default{
 		draw circle(tableRadius) at: location color: #green;
 	}
+	
+	reflex logAgents{
+		list<Guest> l <-PartyGuest at_distance (tableRadius*4);
+		
+		write "["+name+"]:" color:#gold;
+		
+		loop g over: l { 
+			 ask g{
+			 	write name+" s"+status;
+			 }
+		} 
+		
+		list<Guest> l <-ChillGuest at_distance (tableRadius*4);
+		
+		write "["+name+"]:" color:#gold;
+		
+		loop g over: l { 
+			 ask g{
+			 	write name+" s"+status;
+			 }
+		} 
+		
+		write "--------------------";
+	}
+	
+	
+	
 }
 
 species Exit{
