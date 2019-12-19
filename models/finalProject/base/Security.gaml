@@ -6,7 +6,7 @@
 ***/
 
 model Security
-import "./../base/finalProject_0.gaml"
+import "finalProject_0.gaml"
 
 species Security skills:[moving, fipa]{
 	rgb myColor <- #red;

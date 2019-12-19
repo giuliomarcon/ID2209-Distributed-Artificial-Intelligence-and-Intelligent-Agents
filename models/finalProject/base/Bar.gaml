@@ -6,7 +6,7 @@
 ***/
 
 model Bar
-import "./../base/finalProject_0.gaml"
+import "finalProject_0.gaml"
 
 species Bar skills:[fipa]{
 	rgb myColor <- #greenyellow;

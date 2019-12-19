@@ -6,11 +6,11 @@
 ***/
 model finalProject0
 
-import "./../base/Guest.gaml"
-import "./../base/Security.gaml"
-import "./../base/Bar.gaml"
-import "./../base/Supplier.gaml"
-import "./../base/misc.gaml"
+import "Guest.gaml"
+import "Security.gaml"
+import "Bar.gaml"
+import "Supplier.gaml"
+import "misc.gaml"
 
 global {
 	int doorSize <- 6;

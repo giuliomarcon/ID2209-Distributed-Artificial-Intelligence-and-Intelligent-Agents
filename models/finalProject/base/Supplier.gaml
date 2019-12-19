@@ -6,7 +6,7 @@
 ***/
 
 model Supplier
-import "./../base/finalProject_0.gaml"
+import "finalProject_0.gaml"
 
 species Supplier skills:[moving,fipa]{
 	rgb myColor <- #lightblue;

@@ -6,7 +6,7 @@
 ***/
 
 model misc
-import "./../base/finalProject_0.gaml"
+import "finalProject_0.gaml"
 
 species Stage{	
 	rgb myColor <- #red;
