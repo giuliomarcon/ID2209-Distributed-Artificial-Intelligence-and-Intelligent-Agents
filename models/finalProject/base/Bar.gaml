@@ -29,7 +29,7 @@ species Bar skills:[fipa]{
 	reflex evaluateDrunkness when:!empty(cfps){
 		message m<-cfps[0];
 		Guest g<-m.sender;
-		float userDrunkness <- m.contents[0];
+		float userDrunkness <- float(m.contents[0]);
 		
 		//drunk guest, signal to security
 		if(userDrunkness>=drunknesThreshold){
