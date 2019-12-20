@@ -89,6 +89,8 @@ species Guest  skills:[moving,fipa]{
     
     
 	reflex goToTinderArea when: status = 0 and love>= loveTrashold{
+		
+		write "["+name+"]("+status+") need to fine love" ;
 	  	targetPoint <- TinderLocation;
     	status <- 20;
 	}
@@ -134,8 +136,6 @@ species Guest  skills:[moving,fipa]{
 		
 
 		if(flip(talkative/50) and empty(informs) ){
-			
-    		write "["+name+"]("+status+") length of:"+length(informs) color:#blue;
 			status<-4;
 		}else{
     			do wander bounds: square(length);	
@@ -205,17 +205,7 @@ species Guest  skills:[moving,fipa]{
     }
 
     
-    reflex closePendingApproces when: !empty(informs) and (informs[0].sender != communicationPartener) {
-   
-    	loop m over: informs{ 
-    		if(m.sender != communicationPartener){
-		    	write "["+name+"]("+status+") dropping pending approches" color:#purple;
-		    	write "["+name+"]("+status+") m.sender:"+m.sender+" communicationPartener:"+communicationPartener color:#purple;
-		    	write "message:"+informs[0] color:#purple;
-		    	do reply message:m performative:"inform" contents:[false];
-	    	}
-    	}
-    }
+
     
     
     reflex gotACKfromChillGues when: status = 6 and !empty(informs) and (informs[0].sender = communicationPartener) {
@@ -322,18 +312,23 @@ species Guest  skills:[moving,fipa]{
 	// ****************************** TINDER INTERACTIONS ******************************//
     
     reflex atTinderArea when:status = 20 and  location distance_to(TinderLocation)<5{
+    	
+		write "["+name+"]("+status+") got close enough to the tidner area";
     	status <- 21;
     }
     
-    reflex lookAround when: status = 21 {
+    reflex lookAround when: status = 21 and empty(informs){
     	do wander;
     	
+		write "["+name+"]("+status+") looking around"  color:#red;
     	if (flip(talkative/30) ){
     		status <- 22;
     	}else if(location distance_to(TinderLocation) > 10){
     		status <- 100;
     	}
+		write "["+name+"]("+status+") updated status:"+status  color:#red;
     }
+    
 	// catched starting conversation
     reflex receivedApproach when:status=21 and !empty(informs) {//and list(Guest) contains informs[0].sender{
     	message m<- informs[0];
@@ -364,7 +359,6 @@ species Guest  skills:[moving,fipa]{
     	neighbourGuests<-shuffle(neighbourGuests);
     	if(length(neighbourGuests)>0){
     		Guest potentialMate <- neighbourGuests[0];
-    		communicationPartener <- potentialMate;
 	    	
 			write "["+name+"]("+status+") approching:"+potentialMate color:#red;
 	    	
@@ -380,10 +374,12 @@ species Guest  skills:[moving,fipa]{
     		//comunicating where to go
     		tableIndexUsed<-tableIndexUsed;
     		
+    		communicationPartener <- potentialMate;
     		do start_conversation to: list(potentialMate) protocol: 'fipa-contract-net' performative: 'inform' contents: [tableIndexUsed] ;
     		status <- 24;
     	}else{
-    		status <- 21;
+			write "["+name+"]("+status+") no neighbourGuests, falling back to 100" color:#red;
+    		status <- 100;
     	}
     	
     }
@@ -392,7 +388,7 @@ species Guest  skills:[moving,fipa]{
     
     //initator get ACK from target
     //Go to table
-    reflex gotTinderACK when:status = 24 and !empty(informs){
+    reflex gotTinderACK when:status = 24 and !empty(informs) and (informs[0].sender = communicationPartener){
     	mTemp <- informs[0];
     	bool response <- bool(mTemp.contents[0]);
     	
@@ -408,7 +404,7 @@ species Guest  skills:[moving,fipa]{
     		tableBookings[tableIndexUsed]<-false;
     		
 			write "["+name+"]("+status+") ending conversation with:"+mTemp.sender color:#purple;
-    		status <- 21;
+    		status <- 100;
     	}
 		write "["+name+"]("+status+") moved to next stage after reading response" color:#red;
     } 
@@ -428,12 +424,15 @@ species Guest  skills:[moving,fipa]{
     }
     
     //target agent arrived at table and got gender from initiator
-    reflex targetAtTinderTable when:status = 23 and location distance_to(tablePositions[tableIndexUsed]+{tableRadius,0}) <= 2  and !empty(informs){
+    reflex targetAtTinderTable when:status = 23 and location distance_to(tablePositions[tableIndexUsed]+{tableRadius,0}) <= 2  and !empty(informs)  and (informs[0].sender = communicationPartener){
 		message m <- informs[0];
 		string partnerGender <- string(m.contents[0]);
 		
+		write "["+name+"]("+status+") I have reached the tabele and received gender infos from approcher " color:#gold;
+		write "["+name+"]("+status+") message:"+m color:#gold;
+		
 		if (partnerGender = desiredLoveMateGender){
-			write "["+name+"]("+status+") informing "+m.sender + " with ACK and my gender:"+gender color:#blue;
+			write "["+name+"]("+status+") informing "+m.sender + " with ACK and my gender:"+gender color:#gold;
 			do inform message:m contents:[true,gender];
     		status <- 25;
 		}else{
@@ -443,7 +442,7 @@ species Guest  skills:[moving,fipa]{
 		}
     }
     
-	reflex initiatorGotRensponseTinder when: status = 28 and !empty(informs){
+	reflex initiatorGotRensponseTinder when: status = 28 and !empty(informs)  and (informs[0].sender = communicationPartener){
 		message m <- informs[0];
 		bool chatResponse <- bool(m.contents[0]);
 		write "["+name+"]("+status+") Got chat response : "+chatResponse+" from:"+m.sender color:#red;
@@ -459,26 +458,25 @@ species Guest  skills:[moving,fipa]{
 			}
 			
 		}else{
-			do end_conversation message:m contents:[];
-			
-			write "["+name+"]("+status+") ending conversation with:"+mTemp.sender color:#purple;
+			//do end_conversation message:m contents:[];
+			do inform message:m contents:[false];
 			status <- 100;
 		}
 	}
 	
-	reflex targetReceivedOutcomeTinder when:status = 25 and !empty(informs){
+	reflex targetReceivedOutcomeTinder when:status = 25 and !empty(informs)  and (informs[0].sender = communicationPartener){
 		message m <- informs[0];
 		bool chatResponse <- bool(m.contents[0]);
 		
 		if(chatResponse){
 			love<-0.0;
 			status <- 99;
-		}else{
-			do end_conversation message:m contents:[];
-			
-			write "["+name+"]("+status+") ending conversation with:"+mTemp.sender color:#purple;
+		}else{	
 			status <- 100;
 		}
+		do end_conversation message:m contents:[];
+			
+		write "["+name+"]("+status+") ending conversation with:"+mTemp.sender color:#purple;
 		
 	}
 	
@@ -526,7 +524,32 @@ species Guest  skills:[moving,fipa]{
 	// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
 	
 
-// catching start of conversation while already busy
+
+   
+
+    
+	// +++++++++++++++++++++++++++  Security interactions ++++++++++++++++++++++++++++++++++++++++++++++++
+	reflex SecurityInteraction when:status =31 and !empty(informs) and informs[0].sender = list(Security)[0]{
+		message m <- informs[0];
+		targetPoint<-m.contents[0];	
+		write "["+name+"]("+status+") I was caugth by the police! " color:#salmon;
+    }
+    
+  	
+	// +++++++++++++++++++++++++ fsm functioning ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    reflex closePendingApproces when: !empty(informs) and (informs[0].sender != communicationPartener) {
+	   
+    	loop m over: informs{ 
+    		if(m.sender != communicationPartener){
+		    	write "["+name+"]("+status+") dropping pending approches" color:#purple;
+		    	write "["+name+"]("+status+") m.sender:"+m.sender+" communicationPartener:"+communicationPartener color:#purple;
+		    	write "message:"+informs[0] color:#purple;
+		    	do reply message:m performative:"inform" contents:[false];
+	    	}
+		}
+	}
+	
+	// catching start of conversation while already busy
    reflex catchWrongConversationStart when: !empty(informs) and (communicationPartener = nil or informs[0].sender!=communicationPartener){
    		message m <-informs[0];
    		write "["+name+"]("+status+") cathcehd wrong conversation by ("+m.sender+", replying false" color:#orange;
@@ -536,17 +559,6 @@ species Guest  skills:[moving,fipa]{
  
     	
    }
-   
-
-    
-	// +++++++++++++++++++++++++++  Security interactions ++++++++++++++++++++++++++++++++++++++++++++++++
-	/*reflex SecurityInteraction when:status =1 and !empty(informs) and informs[0].sender = list(Security)[0]{
-		message m <- informs[0];
-		targetPoint<-m.contents[0];	
-    }
-    */
-  	
-
 
 	reflex waitBeforeGoingToPreviousActivity when: status = 99 and currentWaitingIteration <= WAITING_ITERATIONS{
 		if(currentWaitingIteration >= WAITING_ITERATIONS){
@@ -567,6 +579,15 @@ species Guest  skills:[moving,fipa]{
 	
 	reflex goBackToActivities when: status = 100{
     		communicationPartener<- nil;
+    		loop m over: informs{
+    			do end_conversation message:m contents:[];
+    		}
+    		loop m over: cfps{
+    			do end_conversation message:m contents:[];
+    		}
+    		loop m over: proposes{
+    			do end_conversation message:m contents:[];
+    		}
     		status <- 0;
 	}
 	

@@ -36,7 +36,7 @@ global {
 	list<bool> tableBookings;
 	//ture table booked, false not
 	int numberOfChill <- 0;
-	int maxChill <- 20;
+	int maxChill <- 0;
 	int numberOfParty <- 0;
 	int maxParty <- 20;
 	int tableNumber <- 15;
