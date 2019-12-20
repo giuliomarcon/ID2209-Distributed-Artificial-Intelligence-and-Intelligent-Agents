@@ -17,7 +17,7 @@ species Guest  skills:[moving,fipa]{
 	point myTablePosition <- nil;
 	int tableIndexUsed <- -1;
 	
-	Guest communicationPartener <- nil;
+	agent communicationPartener <- nil;
 	int neighbouDistance <- 10;
 	
 	//message descriptor where to store the ack before leaving the area, and to be used to send a messaged when reached the table
@@ -37,7 +37,7 @@ species Guest  skills:[moving,fipa]{
 	
 	float loveTrashold <- 1;
 	float danceTrashold <- 0.5;
-	float thirstyTrashold <- 1.0;
+	float thirstyTrashold <- 0.8;
 
 	int watchdogCounter;
 	int status<-0;
@@ -66,10 +66,9 @@ species Guest  skills:[moving,fipa]{
 	}
 	
 	//update needs
-	reflex updateThirsty when:thirsty<thirstyTrashold {
-		if (flip (0.5) = true){
-			thirsty <- thirsty + rnd(0.0, 0.001);
-		}
+	reflex updateThirsty when:thirsty<=thirstyTrashold {
+		thirsty <- thirsty + rnd(0.0, 0.01);
+		
 	}
 		
 	reflex updateLove when:  love<loveTrashold{
@@ -81,27 +80,7 @@ species Guest  skills:[moving,fipa]{
 	}
 	
 	
-    /****************** DANCE INTERACTIONS ***************************************/	    
-    reflex goToDanceArea when:status = 0 and chill2dance>= danceTrashold{
-    	targetPoint<-StageLocation;
-    	status <- 40;
-    }   
-    
-    reflex reachedDanceArena when: status = 40 and location distance_to(StageLocation) < 1 {
-		status <- 41;
-		do wander;
-    }
-    
-    reflex doDance when: status = 41 {
-		if (chill2dance > 0 and location distance_to(StageLocation) <= 15){
-			do wander ;	
-			status <- 41;	
-			chill2dance <- chill2dance - rnd(0.0, 0.01);
-		}else{
-			status <- 100;
-		}
-    }
-    
+
 
     reflex goToChillArea when: status = 0 and chill2dance < danceTrashold{
     	targetPoint<-ChillLocation;
@@ -117,6 +96,28 @@ species Guest  skills:[moving,fipa]{
     reflex goToBar when:status  = 0 and thirsty>= thirstyTrashold {
     	targetPoint<-BarLocation;
     	status <-30;
+    }
+    
+     reflex goToDanceArea when:status = 0 and chill2dance>= danceTrashold{
+    	targetPoint<-StageLocation;
+    	status <- 40;
+    }   
+      
+     /****************** DANCE INTERACTIONS ***************************************/	    
+   
+    reflex reachedDanceArena when: status = 40 and location distance_to(StageLocation) < 1 {
+		status <- 41;
+		do wander;
+    }
+    
+    reflex doDance when: status = 41 {
+		if (chill2dance > 0 and location distance_to(StageLocation) <= 15){
+			do wander ;	
+			status <- 41;	
+			chill2dance <- chill2dance - rnd(0.0, 0.01);
+		}else{
+			status <- 100;
+		}
     }
     
 
@@ -209,6 +210,7 @@ species Guest  skills:[moving,fipa]{
     	loop m over: informs{ 
     		if(m.sender != communicationPartener){
 		    	write "["+name+"]("+status+") dropping pending approches" color:#purple;
+		    	write "["+name+"]("+status+") m.sender:"+m.sender+" communicationPartener:"+communicationPartener color:#purple;
 		    	write "message:"+informs[0] color:#purple;
 		    	do reply message:m performative:"inform" contents:[false];
 	    	}
@@ -229,7 +231,7 @@ species Guest  skills:[moving,fipa]{
     	}else{
     		do end_conversation message: mTemp contents:[];
     		tableBookings[tableIndexUsed]<-false;
-	    	write "["+name+"]("+status+") ABORT GOING TO TABLE" color:#blue;
+	    	write "["+name+"]("+status+") ABORT GOING TO TABLE" color:#purple;
     		
     		status <-100;
     	}
@@ -328,6 +330,8 @@ species Guest  skills:[moving,fipa]{
     	
     	if (flip(talkative/30) ){
     		status <- 22;
+    	}else if(location distance_to(TinderLocation) > 10){
+    		status <- 100;
     	}
     }
 	// catched starting conversation
@@ -393,6 +397,7 @@ species Guest  skills:[moving,fipa]{
     		do end_conversation message: mTemp contents:[];
     		tableBookings[tableIndexUsed]<-false;
     		
+			write "["+name+"]("+status+") ending conversation with:"+mTemp.sender color:#purple;
     		status <- 21;
     	}
     } 
@@ -434,6 +439,8 @@ species Guest  skills:[moving,fipa]{
 			
 		}else{
 			do end_conversation message:m contents:[];
+			
+			write "["+name+"]("+status+") ending conversation with:"+mTemp.sender color:#purple;
 			status <- 100;
 		}
 	}
@@ -447,6 +454,8 @@ species Guest  skills:[moving,fipa]{
 			status <- 99;
 		}else{
 			do end_conversation message:m contents:[];
+			
+			write "["+name+"]("+status+") ending conversation with:"+mTemp.sender color:#purple;
 			status <- 100;
 		}
 		
@@ -454,9 +463,18 @@ species Guest  skills:[moving,fipa]{
 	
 	
 	// ****************************** BAR INTERACTIONS ******************************//
+	reflex goToBar when: status= 0 and thirsty>=thirstyTrashold {
+		status <- 30;
+		targetPoint <-BarLocation;
+		write "["+name+"]("+status+") need to drink" color:#brown;
+	}
+	
+	
 	reflex askMenuBar when:status = 30 and location distance_to(BarLocation) < 5{
+		communicationPartener <- list(Bar)[0];
 		do start_conversation to: list(Bar) protocol: 'fipa-contract-net' performative: 'cfp' contents: [drunkness] ;
 		
+		write "["+name+"]("+status+") communicationPartener:"+communicationPartener color:#brown;
 		status <- 31;
 		//write name+ "ask the menu:"+thirsty color:#blue;
 	}
@@ -468,18 +486,20 @@ species Guest  skills:[moving,fipa]{
 		int numElem <- length(menu);
 		int selectedItem <- rnd(0,numElem-1);
 		
+		write "["+name+"]("+status+") communicationPartener:"+communicationPartener color:#brown;
 		status <- 32;
 		do accept_proposal message:m contents: [selectedItem];
 	}	
 	
-	reflex selectBeverage when: status = 2 and !empty(informs){
+	reflex selectBeverage when: status = 32 and !empty(informs){
+		write "["+name+"]("+status+") communicationPartener:"+communicationPartener color:#brown;
 		message m <- informs[0];
 		float alchoolIncrement <- float(m.contents[0]);
 		
 		drunkness<- drunkness+alchoolIncrement;
 		
 		thirsty <- 0.0;
-		status <-0;
+		status <-100;
 	}
 	
 	// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//

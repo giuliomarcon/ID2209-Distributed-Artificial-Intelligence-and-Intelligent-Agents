@@ -76,6 +76,7 @@ species Bar skills:[fipa]{
 		message m <- agrees[0];
 		beverageSupply[int(m.contents[0])] <- beverageSupply[int(m.contents[0])] + int(m.contents[1]);
 		
+		write "["+name+"] ending conversation with:"+m.sender color:#brown;
 		do end_conversation message:m contents:[];
 		
 	}
