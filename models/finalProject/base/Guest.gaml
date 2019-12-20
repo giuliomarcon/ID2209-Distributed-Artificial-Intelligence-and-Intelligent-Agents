@@ -207,9 +207,11 @@ species Guest  skills:[moving,fipa]{
     reflex closePendingApproces when: !empty(informs) and (informs[0].sender != communicationPartener) {
    
     	loop m over: informs{ 
-	    	write "["+name+"]("+status+") dropping pending approches" color:#purple;
-	    	write "message:"+informs[0] color:#purple;
-	    	do reply message:m performative:"inform" contents:[false];
+    		if(m.sender != communicationPartener){
+		    	write "["+name+"]("+status+") dropping pending approches" color:#purple;
+		    	write "message:"+informs[0] color:#purple;
+		    	do reply message:m performative:"inform" contents:[false];
+	    	}
     	}
     }
     
