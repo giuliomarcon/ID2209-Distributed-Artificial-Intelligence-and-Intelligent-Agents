@@ -340,10 +340,14 @@ species Guest  skills:[moving,fipa]{
     	communicationPartener <- m.sender;
 	    	
 		tableIndexUsed<-int(m.contents[0]);
+		
+		write "["+name+"]("+status+") catched tinder conversation starting from:"+m.sender + "giving ACK" color:#blue;
 		do inform message:m contents:[true];
 		
 		targetPoint  <- tablePositions[tableIndexUsed]+{tableRadius,0};
 		status <- 23;
+		
+		write "["+name+"]("+status+") status updated" color:#blue;
     }
     
     // Reached TinderArea, starting conversation to agent   
@@ -356,11 +360,13 @@ species Guest  skills:[moving,fipa]{
     	add PartyneighbourGuests all:true to: neighbourGuests;
     	add ChillneighbourGuests all:true to: neighbourGuests;
     	
+    	
     	neighbourGuests<-shuffle(neighbourGuests);
     	if(length(neighbourGuests)>0){
     		Guest potentialMate <- neighbourGuests[0];
     		communicationPartener <- potentialMate;
 	    	
+			write "["+name+"]("+status+") approching:"+potentialMate color:#red;
 	    	
 	    	tableIndexUsed <- rnd (0,tableNumber-1);
 		    
@@ -388,7 +394,11 @@ species Guest  skills:[moving,fipa]{
     //Go to table
     reflex gotTinderACK when:status = 24 and !empty(informs){
     	mTemp <- informs[0];
-    	if (bool(mTemp.contents[0])){
+    	bool response <- bool(mTemp.contents[0]);
+    	
+		write "["+name+"]("+status+") got ACK (or NACK) from:"+mTemp.sender+" value:"+response color:#red;
+		
+    	if (response){
 	    	targetPoint <- tablePositions[tableIndexUsed]-{tableRadius,0};
 	    	
 	    	status <- 26;
@@ -400,23 +410,34 @@ species Guest  skills:[moving,fipa]{
 			write "["+name+"]("+status+") ending conversation with:"+mTemp.sender color:#purple;
     		status <- 21;
     	}
+		write "["+name+"]("+status+") moved to next stage after reading response" color:#red;
     } 
+    
+   
     
     //initiator arrived at table, send its gender
     reflex initiatorAtTinderTable when:status = 26 and targetPoint!=nil and location distance_to(targetPoint) <= 2 {
+		write "["+name+"]("+status+") Informing "+mTemp.sender+" my gender:"+gender color:#red;
     	do inform message: mTemp contents:[gender];
     	status <-28;
     }
     
+    reflex debuggingStatus23 when: status=23 and false{
+		write "["+name+"]("+status+") status distance"+location distance_to(tablePositions[tableIndexUsed]+{tableRadius,0}) color:#blue;	
+		write "["+name+"]("+status+") informs:"+informs color:#blue;
+    }
+    
     //target agent arrived at table and got gender from initiator
-    reflex targetAtTinderTable when:status = 23 and location distance_to(tablePositions[tableIndexUsed]-{tableRadius,0}) <= 2  and !empty(informs){
+    reflex targetAtTinderTable when:status = 23 and location distance_to(tablePositions[tableIndexUsed]+{tableRadius,0}) <= 2  and !empty(informs){
 		message m <- informs[0];
 		string partnerGender <- string(m.contents[0]);
 		
 		if (partnerGender = desiredLoveMateGender){
+			write "["+name+"]("+status+") informing "+m.sender + " with ACK and my gender:"+gender color:#blue;
 			do inform message:m contents:[true,gender];
     		status <- 25;
 		}else{
+			write "["+name+"]("+status+") informing "+m.sender + " with NACK and resetting to 100" color:#blue;
 			do inform message:m contents:[false];
 			status <- 100;	
 		}
@@ -425,7 +446,7 @@ species Guest  skills:[moving,fipa]{
 	reflex initiatorGotRensponseTinder when: status = 28 and !empty(informs){
 		message m <- informs[0];
 		bool chatResponse <- bool(m.contents[0]);
-		
+		write "["+name+"]("+status+") Got chat response : "+chatResponse+" from:"+m.sender color:#red;
 		if(chatResponse){
 			string targetGender <- string(m.contents[1]);
 			if(targetGender = desiredLoveMateGender){
