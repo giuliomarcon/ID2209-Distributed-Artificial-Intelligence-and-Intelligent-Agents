@@ -14,16 +14,24 @@ import "./../base/finalProject_0.gaml"
 species Guest  skills:[moving,fipa]{
 	rgb guestColor <- #red;	
 	point targetPoint <- nil;
+	point myTablePosition <- nil;
+	int tableIndexUsed <- -1;
 	
+	Guest communicationPartener <- nil;
 	int neighbouDistance <- 10;
+	
+	//message descriptor where to store the ack before leaving the area, and to be used to send a messaged when reached the table
+	message mTemp;
 
 	// Treats
 	float drunkness <- 0.0;
-	float talkative <- 0.0;
+	//float talkative <- 0.0;
+	float talkative <- 1.0;
 	float love <- 0.0;
 	float thirsty <- 0.0;
 	float chill2dance <- 0.0;
 	string gender;
+	string desiredLoveMateGender;
 	
 	
 	
@@ -31,36 +39,25 @@ species Guest  skills:[moving,fipa]{
 	float danceTrashold <- 0.5;
 	float thirstyTrashold <- 1.0;
 
-	int status<-3;
+	int watchdogCounter;
+	int status<-0;
 	
 	int currentWaitingIteration <-0;
-	
-	int tableUsedIndex<- -1;
-	message tableConversationMessage ;
-	point myTablePosition;
-	/*
-	 * 0: want to drink
-	 * 1: asked menu
-	 * 2: received menu, ask for a drink
-	 * 3: drinked, redy to go chill\dance;
-	 * 4: wandering
-	 * 5: approched guest reply
-	 * 6: guests goes to the booked table
-	 * 7: guest is at the table
-	 * 8: guest going to tinderArea
-	 * 9: guest reached tinderArea
-	 * 10: guests matched at tinderArea, going to table
-	 * 11: guests received approach in the tinderArea, evaluating partner
-	 * 12: approcher (tinder) goinig to booked table
-	 * 13: approcher (tinder) reached to booked table
-	 * 
-	 * 99: waiting ('talking') at the table, then go to tatus 3
-	 */
+	string partnerName <- nil;
+ 	  
+
+
 	init {
 		if(flip(0.5)){
 			gender<-'M';
 		}else{
 			gender<-'F';
+		}
+		
+		if(flip(0.5)){
+			desiredLoveMateGender<-'M';
+		}else{
+			desiredLoveMateGender<-'F';
 		}
 	}
 	
@@ -68,227 +65,206 @@ species Guest  skills:[moving,fipa]{
 		do goto target:targetPoint;
 	}
 	
-	reflex updateThirsty when:thirsty<thirstyTrashold and status = 4 {
+	//update needs
+	reflex updateThirsty when:thirsty<thirstyTrashold {
 		if (flip (0.5) = true){
-//		if(true){
-			thirsty <- thirsty + rnd(0.0, 0.01);
-			//thirsty <- thirsty + 0.3;
-			//write name+ "thirsty:"+thirsty;
+			thirsty <- thirsty + rnd(0.0, 0.001);
 		}
 	}
-	
-//	reflex introduceToBartender when:thirsty>=thirstyTrashold and location distance_to(BarLocation) < 0.5{
-//		do start_conversation to: list(Bar) protocol: 'fipa-contract-net' performative: 'inform' contents: [drunkness] ;
-//		thirsty<-0.0;
-//		write name+ "ask the menu:"+thirsty color:#blue;
-//	}
-
-	reflex logTreats  when:false{
-		write "drunkness:"+drunkness +" thirsty:"+thirsty+ " status:"+status +" love:"+love;
-		write tableBookings;
-	}
-	
-	reflex updateLove when:  status = 4{
+		
+	reflex updateLove when:  love<loveTrashold{
 		love<-love+rnd(0.0,0.008);
 	}
 	
-	reflex askMenuBar when:status = 0 and thirsty>=thirstyTrashold and location distance_to(BarLocation) < 5{
-		do start_conversation to: list(Bar) protocol: 'fipa-contract-net' performative: 'cfp' contents: [drunkness] ;
-		
-		thirsty<-0.0;
-		status <- 1;
-		//write name+ "ask the menu:"+thirsty color:#blue;
-	}
-	
-	reflex receivedMenu when:status = 1 and !empty(proposes) {
-		message m <- proposes[0];
-		list<string> menu <- (m.contents);
-		
-		int numElem <- length(menu);
-		int selectedItem <- rnd(0,numElem-1);
-		
-		
-		//write name+"got menu:"+m.contents color:#purple;
-		//write name+"Selected:"+selectedItem color:#purple;
-		status <- 2;
-		do accept_proposal message:m contents: [selectedItem];
-	}	
-	
-
-//	reflex logMessages {
-//		loop c over:conversations{
-//			write "conversation with:"+c;
-//		}
-//		loop m over:mailbox{
-//			write "meesage::"+m;
-//		}
-//		write "proposes length:"+length(proposes) color:#pink;
-//		write "is proposes not empty?:"+!empty(proposes) color:#pink;
-//		
-//		
-//	}
-	reflex selectBeverage when: status = 2 and !empty(informs){
-		message m <- informs[0];
-		float alchoolIncrement <- float(m.contents[0]);
-		
-		drunkness<- drunkness+alchoolIncrement;
-		status <-3;
-	}
-	
-	reflex imDrunk when:drunkness>=drunknesThreshold{
-		//write name+"sono sbronzo!" color:#red;
-	}
-	
-	reflex arrived2location when: targetPoint!= nil and location distance_to(targetPoint) < 1{
-		targetPoint<-nil;
-	}
-	
-	reflex dance when: status = 4{
-		float length<-10.0;
-		if (flip (chill2dance) = true){
-			do wander bounds: square(length) ;
-		}
-	}
-	
-    reflex goToStage when:status = 3 and chill2dance>= danceTrashold  and location distance_to(StageLocation) > 5 {
+		    
+    reflex goToDanceArea when:status = 0 and chill2dance>= danceTrashold{
     	targetPoint<-StageLocation;
-    	//write name + "belongs to party stage";
-    }    
+    	status <- 1;
+    }   
     
-    reflex goToChill when:status = 3 and chill2dance< danceTrashold  and location distance_to(ChillLocation) > 5{
-    	targetPoint<-ChillLocation;
-    	//write name + "belongs to chill stage";
-    }    
-    
-    reflex goToBar when:status  = 4 and thirsty>= thirstyTrashold {
-    	targetPoint<-BarLocation;
-    	status <-0;
-    }
-    reflex goToTinder when:status  = 3 and love >= loveTrashold {
-    	//write name+"trashold reached";
-    	love<-0.0;
-    	targetPoint<-TinderLocation;
-    	status <-8;
-    }
-    
-    reflex arrivedAtDanceFloor when:status = 3 and (location distance_to(StageLocation)<5 or location distance_to(ChillLocation)<5) {
-    	status <- 4;
-    }
-     
-    reflex SecurityInteraction when:status =1 and !empty(informs) and informs[0].sender = list(Security)[0]{
-		message m <- informs[0];
-	
-		targetPoint<-m.contents[0];
+    reflex doDance when: status = 1 and location distance_to(StageLocation) < 5 {
+		float length<-10.0;
 		
-    }
-    
-    reflex checkCondition when:false  and status=4{
-    	//write name+"status 4";
-    }
-    
-
-      
- 
-    
-    reflex lookingForMate when:status=4 and location distance_to(ChillLocation)<5 and tableBookings contains(false){
-    	//write name+" I'm lookig for a mate! " color:#darkgreen;
-    	
-    	list<Guest> neighbourGuests;
-    	list<Guest> ChillneighbourGuests <- (ChillGuest at_distance neighbouDistance);
-    	list<Guest> PartyneighbourGuests <- (PartyGuest at_distance neighbouDistance);
-    	
-    	
-    	add PartyneighbourGuests all:true to: neighbourGuests;
-    	add ChillneighbourGuests all:true to: neighbourGuests;
-    	
-    	    	
-    	if(flip(talkative/50) and length(neighbourGuests)>0){
-    		//write name+" there are:"+length(neighbourGuests)+" potential mates";
-    		Guest potentialMate <- neighbourGuests[0];
-	    	//write name+" found "+potentialMate color:#darkgreen;
-	    	
-    		bool tableStatus <- false;
-    		
-    		//booking table 
-    		int tableIndex <-index_of(tableBookings,tableStatus);
-    		tableBookings[tableIndex]<-true;
-    		
-    		
-	    	//write name+" -> "+potentialMate +"lets go to table "+tableIndex color:#darkgreen;
-    		
-    		myTablePosition <- tablePositions[tableIndex]-{tableRadius,0};//+{0,2*tableRadius};
-    		point partnerPosition <- tablePositions[tableIndex]+{tableRadius,0};//+{0,2*tableRadius};
-    		
-    		//comunicating where to go
-    		tableUsedIndex<-tableIndex;
-    		
-    		do start_conversation to: list(potentialMate) protocol: 'fipa-contract-net' performative: 'inform' contents: [partnerPosition,myTablePosition,tableIndex] ;
-    		status <- 5;
-    	}
-    	
-    }
-    
-    //receive inform message by other guest, but i'm already busy talking
-
-    reflex receivedApproachFailed when: !([4,5,8,10] contains status) and !empty(informs) {//and list(Guest) contains informs[0].sender{
-    	message m<- informs[0];
-    	list<unknown> messageContents <-  m.contents;
-    	if(length(messageContents)=3){
-	    	tableUsedIndex <- int(messageContents[2]);
-	
-			do inform message:m contents:[false,tableUsedIndex];
+		targetPoint <- nil;
 		
+		if (chill2dance > 0){
+			if (flip (chill2dance) = true){
+				do wander bounds: square(length) ;
+			}
+			
+			chill2dance <- chill2dance - rnd(0.0, 0.001);
 		}else{
-			write m color:#red;
-			write name+ " s:"+status color:#red;
+			status <- 0;
 		}
 		
-		
     }
     
-    // approched guest reply if he is ok to talk or not
-    reflex mateReply when:status=5 and !empty(informs){
-    	message m<-informs[0];
-    	bool approchSuccess <- bool(m.contents[0]);
+    reflex goToChillArea when: status = 0 and chill2dance < danceTrashold{
+    	targetPoint<-ChillLocation;
+    	status <- 2;
+    }
     
-    	if(approchSuccess)	{
-    		//going to the table
-    		//write name + " approach suceed message";
-    		myTablePosition <- m.contents[1];
-    		targetPoint<-myTablePosition;
-    		status <- 6;
-    		tableConversationMessage <- m;
-    	}else{
-    		//write name + " recived failed approach";
+    
+	reflex goToTinderArea when: status = 0 and love>= loveTrashold{
+	  	targetPoint <- TinderLocation;
+    	status <- 20;
+	}
+        
+    reflex goToBar when:status  = 0 and thirsty>= thirstyTrashold {
+    	targetPoint<-BarLocation;
+    	status <-30;
+    }
+    
+
+    //*************************** CHILL INTERACTIONS ****************************************
+    reflex arrivedAtChillArea when: location distance_to(ChillLocation) < 1 and status = 2{
+    	targetPoint <- nil;
+    	status <-3;
+    }
+    
+    reflex randomWaitChillArea when: status = 3 and empty(informs){
+		float length<-10.0;
+		targetPoint <- nil;
+		communicationPartener<-nil;
+		
+
+		if(flip(talkative/50) and empty(informs) ){
 			
-			//unbook table
-			//write("mate reply unbook table");
-    		int bookedTableNumber <- int(m.contents[1]);
-    		tableBookings[bookedTableNumber]<-false;
-    		
-			do end_conversation message:m contents:[];
-    		status <- 4;
+    		write "["+name+"]("+status+") length of:"+length(informs) color:#blue;
+			status<-4;
+		}else{
+    			do wander bounds: square(length);	
+ 
+		}
+    	
+    }
+    
+    //initiator start conversation
+    reflex startConverationChill when: status = 4{
+    	//in the mean time somebody contacted me, go to reply
+    	if (!empty(informs)){
+	    	write "["+name+"]("+status+") While I was going to approch somebody i recevide an approcha, ,go back to status 3 sender:"+informs[0].sender color:#blue;
+    		status <- 3;
+    	}else{   	
+	    	list<Guest> neighbourGuests;
+	    	list<Guest> ChillneighbourGuests <- (ChillGuest at_distance neighbouDistance);
+	    	list<Guest> PartyneighbourGuests <- (PartyGuest at_distance neighbouDistance);
+	    	    	    	
+	    	add PartyneighbourGuests all:true to: neighbourGuests;
+	    	add ChillneighbourGuests all:true to: neighbourGuests;
+	    	
+	    	if(length(neighbourGuests)>0){
+	    		Guest potentialMate <- neighbourGuests[0];
+		    	    		
+	    		//booking table 
+	    		tableIndexUsed <- rnd (0,tableNumber-1);
+		    
+			    loop while: tableBookings[tableIndexUsed] { 
+		    		tableIndexUsed <- rnd (0,tableNumber-1);
+				}
+		    	
+	    		tableBookings[tableIndexUsed]<-true;
+	    		    		
+	    		communicationPartener<-potentialMate;
+	    		
+	    		write "["+name+"]("+status+") Starting conversation with "+potentialMate color:#blue;
+	    		ask potentialMate{
+	    			write " his status is "+status color:#blue;
+	    			write " #######################################" color:#blue;
+	    		}
+	    		do start_conversation to: list(potentialMate) protocol: 'fipa-contract-net' performative: 'inform' contents: [tableIndexUsed] ;
+	    		status <- 6;
+	    		
+	    		write "["+name+"]("+status+") Start conversation with "+potentialMate color:#blue;
+	    	}else{
+	    		status <-100;
+	    		write "["+name+"]("+status+") failed start conversation, go back to status 100" color:#blue;
+	    	}
+    	
     	}
     }
     
-    //receive inform message by other guest
-    reflex receivedApproach when:status=4 and !empty(informs) {//and list(Guest) contains informs[0].sender{
-    	message m<- informs[0];
-		targetPoint<-m.contents[1];
-		point matePoint<-m.contents[0];
-		//write name+": "+m.sender+" approached me, going to point:"+targetPoint;
-		do inform message:m contents:[true,matePoint];
-		status <- 7;
+    //target catch starting conversation and reply with ACK
+    reflex catchConversationStart when:status=3 and !empty(informs){
+    	if( length(informs)>1){
+	    	write " ++++  ++++" color:#orange;
+	    	write " OCCODIOOOO "+length(informs) color:#orange;
+	    	write " ++++  ++++" color:#orange;
+    	}
+    	message m<-informs[0];
+    	tableIndexUsed <- int(m.contents[0]);
+    	communicationPartener <- Guest(m.sender);
+    	write "["+name+"]("+status+") reply ACK to "+m.sender color:#red;
+    	do reply performative:"inform" message:m  contents:[true];
+    	
+    	status <- 5;
+    	write "["+name+"]("+status+")" color:#red;
+    	
+    	
+    }
+
+    
+    reflex closePendingApproces when: !empty(informs) and (informs[0].sender != communicationPartener) {
+   
+    	loop m over: informs{ 
+	    	write "["+name+"]("+status+") dropping pending approches" color:#purple;
+	    	write "message:"+informs[0] color:#purple;
+	    	do reply message:m performative:"inform" contents:[false];
+    	}
     }
     
-    //approching guest says its chill2dance value
-  	reflex reachedTable when: status=6 and location distance_to(targetPoint)<2 {
-  		do cfp message:tableConversationMessage contents:[chill2dance];
-  		status <-7;
-  	}
-  	
-  	//approched guest receive chill2dance of approcher
-  	reflex getC2D when: status = 7 and !empty(cfps){
+    
+    reflex gotACKfromChillGues when: status = 6 and !empty(informs) and (informs[0].sender = communicationPartener) {
+    	mTemp<-informs[0];
+    	write "["+name+"] got inform meesage:"+mTemp color:#blue;
+    	bool  approachStatus <- bool(mTemp.contents[0]);
+    	
+    	write "["+name+"]("+status+") message: "+mTemp color:#blue;
+    	
+    	if(approachStatus){
+	    	targetPoint <-  tablePositions[tableIndexUsed]-{tableRadius,0};
+	    	write "["+name+"]("+status+") going to table: "+tableIndexUsed+" position:"+targetPoint color:#blue;
+    	}else{
+    		do end_conversation message: mTemp contents:[];
+    		tableBookings[tableIndexUsed]<-false;
+	    	write "["+name+"]("+status+") ABORT GOING TO TABLE" color:#blue;
+    		
+    		status <-100;
+    	}
+    }
+    
+    //initiator reached table
+    reflex initiatoreReachedTableChill when:status  = 6 and targetPoint!=nil and location distance_to(targetPoint)<= 2{
+    	write "["+name+"]("+status+")Reached table" color:#blue;
+		status <- 8;
+    }
+    
+    //target goes to table
+    reflex targetGoesToTableChill when:status = 5 {
+    	targetPoint <- tablePositions[tableIndexUsed]+{tableRadius,0};
+    	write "["+name+"]("+status+")I'm going to table:" + tableIndexUsed + " position:"+targetPoint color:#red;
+    	status <- 7;
+    }
+    
+    // target agent is at table
+    reflex targetAtTable when: status=7 and location distance_to(targetPoint)<= 2{
+		status <- 9;
+    	write "["+name+"] reached table" color:#red;
+	}
+
+	//initiator communicate its Chill2Dance to target
+	reflex sendC2dToTarget when: status  = 8 {
+		do cfp message:mTemp contents:[chill2dance];
+    	write "["+name+"] at the table sending chill2dance:"+chill2dance+ "to:"+mTemp.sender color:#blue;
+  
+		status <- 10;
+	}
+
+	//target recevide initator C2D
+	//update its own chill 2 dance
+	reflex gotC2D when:status = 9 and !empty(cfps) and (cfps[0].sender = communicationPartener){
+		
+    	write "["+name+"] got C2D" color:#red;
 		message m <- cfps[0];
 		float c2dApprocher <- float(m.contents[0]); 
 		float c2dApprocherExtreme <- float(m.contents[0]); 
@@ -322,15 +298,13 @@ species Guest  skills:[moving,fipa]{
 			}
 		}
 		
+
+    	status <-99; 	
 		
-    	//write name+"sent info about the outcome of the conversation " + m.contents[0] + "go back to previous activity";
-    	//waiting for a wgile at the table before go back to previous activity
-    	status <-99;
-    	
-  	}
-    
-    //received info about the outcome of the conversation
-    reflex gotProposal when: status = 7 and !empty(proposes)  {
+	}
+	
+	//received info about the outcome of the conversation
+    reflex gotProposal when: status = 10 and !empty(proposes)  and (proposes[0].sender = communicationPartener) {
     	message m <- proposes[0];
     	chill2dance <- chill2dance + float(m.contents[0]);
     	// TODO end_conversation
@@ -340,11 +314,33 @@ species Guest  skills:[moving,fipa]{
     	//waiting for a wgile at the table before go back to previous activity
     	status <-99;
     }
+	// ****************************** TINDER INTERACTIONS ******************************//
     
-    // Reached TinderArea, looking for a soul mate
-    reflex lookingForSoulMate when:status=8 and location distance_to(TinderLocation)<5 and tableBookings contains(false){
-    	//status<-9;
-    	//write name+" reached tinderArea";
+    reflex atTinderArea when:status = 20 and  location distance_to(TinderLocation)<5{
+    	status <- 21;
+    }
+    
+    reflex lookAround when: status = 21 {
+    	do wander;
+    	
+    	if (flip(talkative/30) ){
+    		status <- 22;
+    	}
+    }
+	// catched starting conversation
+    reflex receivedApproach when:status=21 and !empty(informs) {//and list(Guest) contains informs[0].sender{
+    	message m<- informs[0];
+    	communicationPartener <- m.sender;
+	    	
+		tableIndexUsed<-int(m.contents[0]);
+		do inform message:m contents:[true];
+		
+		targetPoint  <- tablePositions[tableIndexUsed]+{tableRadius,0};
+		status <- 23;
+    }
+    
+    // Reached TinderArea, starting conversation to agent   
+    reflex lookingForSoulMate when:status=22 and tableBookings contains(false){
     	list<Guest> neighbourGuests;
     	list<Guest> ChillneighbourGuests <- (ChillGuest at_distance neighbouDistance);
     	list<Guest> PartyneighbourGuests <- (PartyGuest at_distance neighbouDistance);
@@ -354,166 +350,201 @@ species Guest  skills:[moving,fipa]{
     	add ChillneighbourGuests all:true to: neighbourGuests;
     	
     	neighbourGuests<-shuffle(neighbourGuests);
-    	if(flip(talkative/30) and length(neighbourGuests)>0){
-    		//write name+" in  tinderArea there are:"+length(neighbourGuests)+" potential mates" color:#red;
+    	if(length(neighbourGuests)>0){
     		Guest potentialMate <- neighbourGuests[0];
-	    	//write name+" in  tinderArea  found "+potentialMate color:#darkgreen;
+    		communicationPartener <- potentialMate;
 	    	
 	    	
-	    	int tableIndex <- rnd (0,tableNumber-1);
+	    	tableIndexUsed <- rnd (0,tableNumber-1);
 		    
-		    loop while: tableBookings[tableIndex] { 
-	    		tableIndex <- rnd (0,tableNumber-1);
+		    loop while: tableBookings[tableIndexUsed] { 
+	    		tableIndexUsed <- rnd (0,tableNumber-1);
 			}
 	    	
-    		tableBookings[tableIndex]<-true;
+    		tableBookings[tableIndexUsed]<-true;
     		
-    		
-	    	//write name+"[in  tinderArea ]-> "+potentialMate +"lets go to table "+tableIndex color:#darkgreen;
-    		
-    		myTablePosition <- tablePositions[tableIndex]-{tableRadius,0};
-    		point partnerPosition <- tablePositions[tableIndex]+{tableRadius,0};
     		
     		//comunicating where to go
-    		tableUsedIndex<-tableIndex;
+    		tableIndexUsed<-tableIndexUsed;
     		
-    		do start_conversation to: list(potentialMate) protocol: 'fipa-contract-net' performative: 'inform' contents: [partnerPosition,myTablePosition,tableIndex] ;
-    		status <- 10;
+    		do start_conversation to: list(potentialMate) protocol: 'fipa-contract-net' performative: 'inform' contents: [tableIndexUsed] ;
+    		status <- 24;
     	}else{
-    		write name+" waiting inthe tinderArea status:"+status color:#lightblue;
+    		status <- 21;
     	}
     	
     }
-    
+	
 
-    //receive approach message by other guest
-    reflex receivedTinderApproach when:status=8 and !empty(informs) {//and list(Guest) contains informs[0].sender{
-    	message m<- informs[0];
-		targetPoint<-m.contents[1];
-		point matePoint<-m.contents[0];
-		//write name+": "+m.sender+" approached me in  tinderArea , going to point:"+targetPoint color:#blue;
-		do inform message:m contents:[true,matePoint];
-		status <- 11;
-    }
     
-    //the approched guest replied to table message
-    reflex tinderMateReply when:status=10 and !empty(informs){
-    	message m<-informs[0];
-    	bool approchSuccess <- bool(m.contents[0]);
-    
-    	if(approchSuccess)	{
-    		//going to the table
-    		//write name + " approach suceed message";
-    		myTablePosition <- m.contents[1];
-    		targetPoint<-myTablePosition;
-    		status <- 12;
-    		tableConversationMessage <- m;
+    //initator get ACK from target
+    //Go to table
+    reflex gotTinderACK when:status = 24 and !empty(informs){
+    	mTemp <- informs[0];
+    	if (bool(mTemp.contents[0])){
+	    	targetPoint <- tablePositions[tableIndexUsed]-{tableRadius,0};
+	    	
+	    	status <- 26;
     	}else{
-    		//write name + " recived failed approach";
-			do end_conversation message:m contents:[];
-			
-			//unbook table
-    		int bookedTableNumber <- int(m.contents[1]);
-    		tableBookings[bookedTableNumber]<-false;
     		
-    		status <- 8;
+    		do end_conversation message: mTemp contents:[];
+    		tableBookings[tableIndexUsed]<-false;
+    		
+    		status <- 21;
     	}
+    } 
+    
+    //initiator arrived at table, send its gender
+    reflex initiatorAtTinderTable when:status = 26 and targetPoint!=nil and location distance_to(targetPoint) <= 2 {
+    	do inform message: mTemp contents:[gender];
+    	status <-28;
     }
     
-    //approching tinder guest says its chill2dance value
-  	reflex rechedTinderTable when: status=12 and location distance_to(targetPoint)<2 {
-  		do cfp message:tableConversationMessage contents:[chill2dance];
-  		status <-13;
-  	}
-  	
-  	
-    //approched guest receive chill2dance of approcher
-  	reflex getTinderC2D when: status = 11 and !empty(cfps){
-		message m <- cfps[0];
-		float c2dApprocher <- float(m.contents[0]); 
-		float c2dApprocherExtreme <- float(m.contents[0]); 
-		float c2dExtreme <- chill2dance;
+    //target agent arrived at table and got gender from initiator
+    reflex targetAtTinderTable when:status = 23 and location distance_to(tablePositions[tableIndexUsed]-{tableRadius,0}) <= 2  and !empty(informs){
+		message m <- informs[0];
+		string partnerGender <- string(m.contents[0]);
 		
-		//write name+ " evauleting tinder mate C2D of"+m.sender;
-		if(c2dApprocherExtreme > 0.5){
-			c2dApprocherExtreme <- 1 - c2dApprocherExtreme;	
+		if (partnerGender = desiredLoveMateGender){
+			do inform message:m contents:[true,gender];
+    		status <- 25;
+		}else{
+			do inform message:m contents:[false];
+			status <- 100;	
 		}
+    }
+    
+	reflex initiatorGotRensponseTinder when: status = 28 and !empty(informs){
+		message m <- informs[0];
+		bool chatResponse <- bool(m.contents[0]);
 		
-		if(c2dExtreme > 0.5){
-			c2dExtreme <- 1 - c2dExtreme;	
-		}
-		
-		//approcher  chilldance is  closer to the relative extreme than mine
-		if(c2dApprocherExtreme < c2dExtreme){
-			if( c2dApprocher>0.5){
-				chill2dance <- chill2dance + communicationIncreasigFactor;
+		if(chatResponse){
+			string targetGender <- string(m.contents[1]);
+			if(targetGender = desiredLoveMateGender){
+				do inform message:m contents:[true];
+				love <-0.0;
+				status <- 99;
 			}else{
-				chill2dance <- chill2dance - communicationIncreasigFactor;
+				do inform message:m contents:[false];
+				status <- 100;
 			}
-			do propose  message:m contents:[0];
-			
 			
 		}else{
-			//mine chill2dance is closer to the relative extreme
-			if(chill2dance > 0.5){
-				do propose  message:m contents:[communicationIncreasigFactor];
-			}else{
-				do propose  message:m contents:[0-communicationIncreasigFactor];
-			}
+			do end_conversation message:m contents:[];
+			status <- 100;
+		}
+	}
+	
+	reflex targetReceivedOutcomeTinder when:status = 25 and !empty(informs){
+		message m <- informs[0];
+		bool chatResponse <- bool(m.contents[0]);
+		
+		if(chatResponse){
+			love<-0.0;
+			status <- 99;
+		}else{
+			do end_conversation message:m contents:[];
+			status <- 100;
 		}
 		
+	}
+	
+	
+	// ****************************** BAR INTERACTIONS ******************************//
+	reflex askMenuBar when:status = 30 and location distance_to(BarLocation) < 5{
+		do start_conversation to: list(Bar) protocol: 'fipa-contract-net' performative: 'cfp' contents: [drunkness] ;
 		
-    	//write name+"sent info about TINDER the outcome of the conversation " + m.contents[0] + "go back to previous activity" color:#purple;
-    	//waiting for a wgile at the table before go back to previous activity
-    	status <-99;
-    	//unbook tabels
-    	//tableBookings[tableUsedIndex]<- false;
-  	}
-        
-   	reflex 	NotegetTinderC2D when: status = 11 and targetPoint =  nil {
-   		write "something went wrong";
-   		love<-0.0;
-   		status<-3;
-   	}
+		status <- 31;
+		//write name+ "ask the menu:"+thirsty color:#blue;
+	}
+	
+	reflex receivedMenu when:status = 31 and !empty(proposes) {
+		message m <- proposes[0];
+		list<string> menu <- (m.contents);
+		
+		int numElem <- length(menu);
+		int selectedItem <- rnd(0,numElem-1);
+		
+		status <- 32;
+		do accept_proposal message:m contents: [selectedItem];
+	}	
+	
+	reflex selectBeverage when: status = 2 and !empty(informs){
+		message m <- informs[0];
+		float alchoolIncrement <- float(m.contents[0]);
+		
+		drunkness<- drunkness+alchoolIncrement;
+		
+		thirsty <- 0.0;
+		status <-0;
+	}
+	
+	// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
+	
+
+// catching start of conversation while already busy
+   reflex catchWrongConversationStart when: !empty(informs) and (communicationPartener = nil or informs[0].sender!=communicationPartener){
+   		message m <-informs[0];
+   		write "["+name+"]("+status+") cathcehd wrong conversation by ("+m.sender+", replying false" color:#orange;
+   		if (m.sender != communicationPartener){
+   			do reply message:m performative:"inform" contents:[false];
+   		}
+ 
+    	
+   }
    
-    //received info about the outcome of the Tinder conversation
-    reflex gotTinderDateOutcome when: !empty(proposes) and status =13 {
-    	message m <- proposes[0];
-    	chill2dance <- chill2dance + float(m.contents[0]);
-    	// TODO end_conversation
-    	
-    	//write name+"received info about the TINDER outcome of the conversation " + m.contents[0] + "go back to previous activity" color:#violet;
-    	
-    //waiting for a wgile at the table before go back to previous activity
-    	status <-99;
+
+    
+	// +++++++++++++++++++++++++++  Security interactions ++++++++++++++++++++++++++++++++++++++++++++++++
+	reflex SecurityInteraction when:status =1 and !empty(informs) and informs[0].sender = list(Security)[0]{
+		message m <- informs[0];
+		targetPoint<-m.contents[0];	
     }
-        //received info about the outcome of the conversation
+    
+  	
+
 
 	reflex waitBeforeGoingToPreviousActivity when: status = 99 and currentWaitingIteration <= WAITING_ITERATIONS{
 		if(currentWaitingIteration >= WAITING_ITERATIONS){
 		//go back to previous activit
-    		status <-3;
+    		
     		currentWaitingIteration <- 0;		
     		//unbook tabels
-			write("leaving the table, unbooking");
-			
-			if(tableUsedIndex!=-1){
-	    		tableBookings[tableUsedIndex]<- false;
-	    		tableUsedIndex <- -1;
+			if(tableIndexUsed!=-1){
+	    		tableBookings[tableIndexUsed]<- false;
+	    		tableIndexUsed <- -1;
     		}
-    		
+    		status <- 100;
     	}else{
     		currentWaitingIteration <-	currentWaitingIteration + 1;
     		
     	}
-    	
 	}
+	
+	reflex goBackToActivities when: status = 100{
+    		communicationPartener<- nil;
+    		status <- 0;
+	}
+	
     
- 
-    reflex logStatus when:true {
-    	write name + "status:"+status;
-    }
+	reflex arrived2location when: targetPoint!= nil and location distance_to(targetPoint) < 1{
+		targetPoint<-nil;
+	}
+	
 
+    //logging
+ 
+    reflex logStatus when:false {
+    	write name + "status:"+status;
+    } 
+    reflex logTables when:false {
+    	write tableBookings;
+    }
+    
+	reflex logTreats  when:false{
+		write "drunkness:"+drunkness +" thirsty:"+thirsty+ " status:"+status +" love:"+love;
+	
+	}
 
     
     aspect default{
@@ -529,16 +560,18 @@ species ChillGuest parent: Guest{
 	bool increasingC2D;
 	
 	init{
-		talkative <- rnd(0.0,1.0);
+		//talkative <- rnd(0.0,1.0);
+		talkative <- 1;
 		chill2dance <- rnd(0.0,0.3);
 		increasingC2D<-flip(0.3);
 	}
+	/*
 	
 	reflex updateC2D when: status=4{
-		/*
-		 * we use increasing beacuse in this way c2d will monotonically increase until 1, then it will monotonically decrese until 0.01,
-		 * This is done to avoid rapid changeing behaviour
-		 */
+		
+		 // we use increasing beacuse in this way c2d will monotonically increase until 1, then it will monotonically decrese until 0.01,
+		 // This is done to avoid rapid changeing behaviour
+		 
 		if(increasingC2D ){
 			float incresingStep <- rnd(0.02,0.04);
 			
@@ -555,12 +588,14 @@ species ChillGuest parent: Guest{
 				chill2dance <- chill2dance - decresingStep;
 			}else{
 				increasingC2D <-true;
+				
 				status<-3;
 			}
 		}
 		
 	}
 		
+*/
     //on the exit square
     reflex exitFestival when: location distance_to(ExitLocation)<1{
     	numberOfChill <-numberOfChill-1;
@@ -583,7 +618,8 @@ species PartyGuest parent: Guest{
 		chill2dance <- rnd(0.4,1.0);
 		increasingC2D<-flip(0.8);
 	}
-	
+
+/*	
 	
 	reflex updateC2D when: status=4{
 		if(increasingC2D ){
@@ -610,10 +646,7 @@ species PartyGuest parent: Guest{
 		
 	}
 	
-	reflex logdrunkness when:false{
-		write "drunkness:"+drunkness;
-	}
-	
+*/
 			
     //on the exit square
     reflex exitFestival when: location distance_to(ExitLocation)<1{
