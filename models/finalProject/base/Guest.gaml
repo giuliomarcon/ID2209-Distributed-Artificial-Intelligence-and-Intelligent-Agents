@@ -74,31 +74,35 @@ species Guest  skills:[moving,fipa]{
 		
 	reflex updateLove when:  love<loveTrashold{
 		love<-love+rnd(0.0,0.008);
+	}	
+	
+	reflex updateChill2Dance when:  chill2dance<1{
+		chill2dance<-chill2dance+rnd(0.0,0.0008);
 	}
 	
-		    
+	
+    /****************** DANCE INTERACTIONS ***************************************/	    
     reflex goToDanceArea when:status = 0 and chill2dance>= danceTrashold{
     	targetPoint<-StageLocation;
-    	status <- 1;
+    	status <- 40;
     }   
     
-    reflex doDance when: status = 1 and location distance_to(StageLocation) < 5 {
-		float length<-10.0;
-		
-		targetPoint <- nil;
-		
-		if (chill2dance > 0){
-			if (flip (chill2dance) = true){
-				do wander bounds: square(length) ;
-			}
-			
-			chill2dance <- chill2dance - rnd(0.0, 0.001);
-		}else{
-			status <- 0;
-		}
-		
+    reflex reachedDanceArena when: status = 40 and location distance_to(StageLocation) < 1 {
+		status <- 41;
+		do wander;
     }
     
+    reflex doDance when: status = 41 {
+		if (chill2dance > 0 and location distance_to(StageLocation) <= 15){
+			do wander ;	
+			status <- 41;	
+			chill2dance <- chill2dance - rnd(0.0, 0.01);
+		}else{
+			status <- 100;
+		}
+    }
+    
+
     reflex goToChillArea when: status = 0 and chill2dance < danceTrashold{
     	targetPoint<-ChillLocation;
     	status <- 2;
@@ -186,11 +190,7 @@ species Guest  skills:[moving,fipa]{
     
     //target catch starting conversation and reply with ACK
     reflex catchConversationStart when:status=3 and !empty(informs){
-    	if( length(informs)>1){
-	    	write " ++++  ++++" color:#orange;
-	    	write " OCCODIOOOO "+length(informs) color:#orange;
-	    	write " ++++  ++++" color:#orange;
-    	}
+
     	message m<-informs[0];
     	tableIndexUsed <- int(m.contents[0]);
     	communicationPartener <- Guest(m.sender);
@@ -282,10 +282,14 @@ species Guest  skills:[moving,fipa]{
 		
 		//approcher  chilldance is  closer to the relative extreme than mine
 		if(c2dApprocherExtreme < c2dExtreme){
-			if( c2dApprocher>0.5){
-				chill2dance <- chill2dance + communicationIncreasigFactor;
+			if( c2dApprocher>0.3){
+				if(chill2dance + communicationIncreasigFactor <= 1){
+					chill2dance <- chill2dance + communicationIncreasigFactor;
+				}
 			}else{
-				chill2dance <- chill2dance - communicationIncreasigFactor;
+				if( chill2dance - communicationIncreasigFactor*0.1>= 0){
+					//chill2dance <- chill2dance - communicationIncreasigFactor*0.1;
+				}
 			}
 			
 			do propose  message:m contents:[0];
@@ -293,10 +297,10 @@ species Guest  skills:[moving,fipa]{
 			
 		}else{
 			//mine chill2dance is closer to the relative extreme
-			if(chill2dance > 0.5){
+			if(chill2dance > 0.3){
 				do propose  message:m contents:[communicationIncreasigFactor];
 			}else{
-				do propose  message:m contents:[0-communicationIncreasigFactor];
+				do propose  message:m contents:[0-communicationIncreasigFactor*0.1];
 			}
 		}
 		
@@ -311,9 +315,6 @@ species Guest  skills:[moving,fipa]{
     	chill2dance <- chill2dance + float(m.contents[0]);
     	// TODO end_conversation
     	
-    	//write name+"received info about the outcome of the conversation " + m.contents[0] + "go back to previous activity";
-    	
-    	//waiting for a wgile at the table before go back to previous activity
     	status <-99;
     }
 	// ****************************** TINDER INTERACTIONS ******************************//
@@ -498,11 +499,11 @@ species Guest  skills:[moving,fipa]{
 
     
 	// +++++++++++++++++++++++++++  Security interactions ++++++++++++++++++++++++++++++++++++++++++++++++
-	reflex SecurityInteraction when:status =1 and !empty(informs) and informs[0].sender = list(Security)[0]{
+	/*reflex SecurityInteraction when:status =1 and !empty(informs) and informs[0].sender = list(Security)[0]{
 		message m <- informs[0];
 		targetPoint<-m.contents[0];	
     }
-    
+    */
   	
 
 
@@ -621,6 +622,9 @@ species PartyGuest parent: Guest{
 		increasingC2D<-flip(0.8);
 	}
 
+	reflex updateChill2Dance when:  chill2dance<1{
+		chill2dance<-chill2dance+rnd(0.0,0.005);
+	}
 /*	
 	
 	reflex updateC2D when: status=4{
