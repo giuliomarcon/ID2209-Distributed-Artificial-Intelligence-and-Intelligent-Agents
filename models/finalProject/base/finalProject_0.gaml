@@ -38,7 +38,7 @@ global {
 	int numberOfChill <- 0;
 	int maxChill <- 0;
 	int numberOfParty <- 0;
-	int maxParty <- 2;
+	int maxParty <- 20;
 	int tableNumber <- 15;
 	float communicationIncreasigFactor <- 0.1;
 
@@ -114,6 +114,12 @@ global {
 		}
 
 		numberOfParty <- numberOfParty + 1;
+	}
+	
+	int cycle <- 0;
+	reflex printCycle{
+		write "cycle: " + cycle;
+		cycle <- cycle+1;
 	}
 
 }

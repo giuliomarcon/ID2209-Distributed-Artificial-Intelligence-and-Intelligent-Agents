@@ -6,7 +6,7 @@
 ***/
 
 model Guest
-import "./../base/finalProject_0.gaml"
+import "finalProject_0.gaml"
 
 
 /* Insert your model definition here */
@@ -35,7 +35,7 @@ species Guest  skills:[moving,fipa]{
 	
 	
 	
-	float loveTrashold <- 1;
+	float loveTrashold <- 1.0;
 	float danceTrashold <- 0.5;
 	float thirstyTrashold <- 0.8;
 
@@ -95,7 +95,7 @@ species Guest  skills:[moving,fipa]{
     	status <- 20;
 	}
         
-    reflex goToBar when:status  = 0 and thirsty>= thirstyTrashold {
+    reflex goToBarLocation when:status  = 0 and thirsty>= thirstyTrashold {
     	targetPoint<-BarLocation;
     	status <-30;
     }
@@ -638,7 +638,7 @@ species ChillGuest parent: Guest{
 	
 	init{
 		//talkative <- rnd(0.0,1.0);
-		talkative <- 1;
+		talkative <- 1.0;
 		chill2dance <- rnd(0.0,0.3);
 		increasingC2D<-flip(0.3);
 	}
