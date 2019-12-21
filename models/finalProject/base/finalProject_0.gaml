@@ -38,7 +38,7 @@ global {
 	int numberOfChill <- 0;
 	int maxChill <- 0;
 	int numberOfParty <- 0;
-	int maxParty <- 20;
+	int maxParty <- 2;
 	int tableNumber <- 15;
 	float communicationIncreasigFactor <- 0.1;
 

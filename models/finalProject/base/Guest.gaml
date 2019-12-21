@@ -313,20 +313,18 @@ species Guest  skills:[moving,fipa]{
     
     reflex atTinderArea when:status = 20 and  location distance_to(TinderLocation)<5{
     	
-		write "["+name+"]("+status+") got close enough to the tidner area";
     	status <- 21;
     }
     
     reflex lookAround when: status = 21 and empty(informs){
     	do wander;
     	
-		write "["+name+"]("+status+") looking around"  color:#red;
+		
     	if (flip(talkative/30) ){
     		status <- 22;
     	}else if(location distance_to(TinderLocation) > 10){
     		status <- 100;
     	}
-		write "["+name+"]("+status+") updated status:"+status  color:#red;
     }
     
 	// catched starting conversation
@@ -436,7 +434,7 @@ species Guest  skills:[moving,fipa]{
 			do inform message:m contents:[true,gender];
     		status <- 25;
 		}else{
-			write "["+name+"]("+status+") informing "+m.sender + " with NACK and resetting to 100" color:#blue;
+			write "["+name+"]("+status+") informing "+m.sender + " with NACK and resetting to 21" color:#blue;
 			do inform message:m contents:[false];
 			status <- 100;	
 		}
@@ -453,20 +451,33 @@ species Guest  skills:[moving,fipa]{
 				love <-0.0;
 				status <- 99;
 			}else{
+				
+				write "["+name+"]("+status+") should reply fals e to:"+m.sender color:#red;
 				do inform message:m contents:[false];
 				status <- 100;
 			}
 			
 		}else{
-			//do end_conversation message:m contents:[];
-			do inform message:m contents:[false];
+			do end_conversation message:m contents:[];
+			//do inform message:m contents:[false];
 			status <- 100;
+		}
+		write "["+name+"]("+status+") updated status accordingly"  color:#red;
+	}
+	
+	reflex debugStatus25 when:status = 25{
+		write "["+name+"]("+status+") ---------- testing STATE 25"+mTemp.sender color:#violet;
+		write "["+name+"]("+status+") length(informs):"+length(informs) color:#violet;
+		if(length(informs)>0){
+				write "["+name+"]("+status+") informs[0]:"+informs[0] color:#violet;
 		}
 	}
 	
 	reflex targetReceivedOutcomeTinder when:status = 25 and !empty(informs)  and (informs[0].sender = communicationPartener){
 		message m <- informs[0];
 		bool chatResponse <- bool(m.contents[0]);
+		
+		write "["+name+"]("+status+") ++++++++++++++ IN THE FUKING STATE 25"+mTemp.sender color:#purple;
 		
 		if(chatResponse){
 			love<-0.0;
@@ -588,6 +599,7 @@ species Guest  skills:[moving,fipa]{
     		loop m over: proposes{
     			do end_conversation message:m contents:[];
     		}
+    		write "["+name+"]("+status+") length of informs"+length(informs);
     		status <- 0;
 	}
 	
