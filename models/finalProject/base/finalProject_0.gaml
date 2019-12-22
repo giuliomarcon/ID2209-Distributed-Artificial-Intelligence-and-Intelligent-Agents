@@ -41,6 +41,8 @@ global {
 	int maxParty <- 20;
 	int tableNumber <- 15;
 	float communicationIncreasigFactor <- 0.1;
+	
+	float chill2danceAVG <- 0.0;
 
 	init {
 	//init table positions
@@ -116,15 +118,29 @@ global {
 		numberOfParty <- numberOfParty + 1;
 	}
 
-	int cycle <- 0;
-
-	reflex printCycle {
-	//write "cycle: " + cycle;
-	//write tableBookings;
-	//write first(tableBookings, false);
-		cycle <- cycle + 1;
+	reflex updateChill2danceAVG {
+		float sumChill2Dance <- 0.0;
+		if(numberOfParty >0 ){
+			list<PartyGuest> partyGuests <- list(PartyGuest);
+			
+			loop g over:partyGuests{
+				sumChill2Dance <- sumChill2Dance + g.chill2dance;
+			}
+		}
+		if (numberOfChill >0 ){
+			list<ChillGuest> chillGuests <- list(ChillGuest);
+			
+			loop g over:chillGuests{
+				sumChill2Dance <- sumChill2Dance + g.chill2dance;
+			}
+		}
+		
+		if((numberOfParty + numberOfChill) > 0 ){
+			chill2danceAVG <- sumChill2Dance/(numberOfParty + numberOfChill);
+		}else{
+			chill2danceAVG <- 0.0;
+		}
 	}
-
 }
 
 experiment Festival type: gui {
@@ -144,17 +160,11 @@ experiment Festival type: gui {
 			species ATM;
 		}
 
-		//TODO: all'inizio non va perché non c'è nessuno
-		//		 display "my_display" {
-		//        chart "my_chart" type: histogram {
-		//        
-		//        //TODO perché non va con la classe pafre guest?
-		//        //we display the drunkness of agent Guest in 20 ranges computed among the ages between 0 and drunknesThreshold.
-		//        datalist (distribution_of(PartyGuest collect each.drunkness,20,0,drunknesThreshold) at "legend") 
-		//            value:(distribution_of(PartyGuest collect each.drunkness,20,0,drunknesThreshold) at "values");      
-		//        
-		//        }
-		//    }
+		display "my_display" {
+		    chart "my_chart" type: series {
+				data "chill2dance AVG" value: chill2danceAVG color: #red;
+	    	}
+		}
 	}
 
 }
