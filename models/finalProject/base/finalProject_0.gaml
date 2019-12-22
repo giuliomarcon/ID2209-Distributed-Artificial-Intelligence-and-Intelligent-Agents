@@ -36,9 +36,9 @@ global {
 	list<bool> tableBookings;
 	//ture table booked, false not
 	int numberOfChill <- 0;
-	int maxChill <- 20;
+	int maxChill <- 25;
 	int numberOfParty <- 0;
-	int maxParty <- 20;
+	int maxParty <- 25;
 	int tableNumber <- 15;
 	float communicationIncreasigFactor <- 0.1;
 	
