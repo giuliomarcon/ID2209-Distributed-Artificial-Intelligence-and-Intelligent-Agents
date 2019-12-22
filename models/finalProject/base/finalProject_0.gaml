@@ -61,7 +61,7 @@ global {
 
 		}
 
-		write tablePositions;
+		//write tablePositions;
 		create Entrance number: 1 {
 			location <- EntranceLocation;
 		}
@@ -93,7 +93,7 @@ global {
 		create Supplier number: 1 {
 			location <- supplierLocation;
 		}
-		
+
 		create ATM number: 1 {
 			location <- ATMLocation;
 		}
@@ -115,13 +115,14 @@ global {
 
 		numberOfParty <- numberOfParty + 1;
 	}
-	
+
 	int cycle <- 0;
-	reflex printCycle{
-		write "cycle: " + cycle;
-		write tableBookings;
-		write first(tableBookings, false);
-		cycle <- cycle+1;
+
+	reflex printCycle {
+	//write "cycle: " + cycle;
+	//write tableBookings;
+	//write first(tableBookings, false);
+		cycle <- cycle + 1;
 	}
 
 }
