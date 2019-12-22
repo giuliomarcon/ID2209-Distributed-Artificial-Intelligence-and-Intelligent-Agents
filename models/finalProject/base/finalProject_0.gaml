@@ -181,8 +181,8 @@ experiment Festival type: gui {
 		display "my_display" {
 		    chart "chill2dance AVG" type: series {
 				data "chill2dance AVG" value: chill2danceAVG color: #gold;
-				data "chill2dance Party AVG" value: chill2danceChillAVG color: #red;
-				data "chill2dance Chill AVG" value: chill2dancePartyAVG color: #blue;
+				data "chill2dance Party AVG" value: chill2dancePartyAVG  color: #red;
+				data "chill2dance Chill AVG" value: chill2danceChillAVG color: #blue;
 	    	}
 		}
 	}
