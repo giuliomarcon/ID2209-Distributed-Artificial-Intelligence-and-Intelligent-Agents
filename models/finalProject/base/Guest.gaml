@@ -16,6 +16,7 @@ species Guest skills: [moving, fipa] {
 	int tableIndexUsed <- -1;
 	agent communicationPartener <- nil;
 	int neighbouDistance <- 10;
+	float defaultCash <- 25.0;
 
 	//message descriptor where to store the ack before leaving the area, and to be used to send a messaged when reached the table
 	message mTemp;
@@ -36,7 +37,9 @@ species Guest skills: [moving, fipa] {
 	int status <- 0;
 	int currentWaitingIteration <- 0;
 	string partnerName <- nil;
-
+	
+	float wallet <- defaultCash;
+	bool needCash <- false;
 	init {
 		if (flip(0.5)) {
 			gender <- 'M';
@@ -67,6 +70,11 @@ species Guest skills: [moving, fipa] {
 
 	reflex updateChill2Dance when: chill2dance < 1 {
 		chill2dance <- chill2dance + rnd(0.0, 0.0008);
+	}
+	
+	reflex goToATM when: needCash{
+		targetPoint <- ATMLocation;
+		status <- 50;
 	}
 
 	reflex goToChillArea when: status = 0 and chill2dance < danceTrashold {
@@ -454,13 +462,20 @@ species Guest skills: [moving, fipa] {
 
 	reflex receivedMenu when: status = 31 and !empty(proposes) {
 		message m <- proposes[0];
-		list<string> menu <- (m.contents);
+		list<string> menu <- (m.contents[0]);
+		list<float> prices <- (m.contents[1]);
 		int numElem <- length(menu);
 		int selectedItem <- rnd(0, numElem - 1);
 
 		//write "["+name+"]("+status+") communicationPartener:"+communicationPartener color:#brown;
-		status <- 32;
-		do accept_proposal message: m contents: [selectedItem];
+		if (wallet< prices[selectedItem]){
+			needCash <- true;
+			status <- 100;
+			//do end_conversation message:m contents:[];
+		}else{
+			status <- 32;
+			do accept_proposal message: m contents: [selectedItem];
+		}
 	}
 
 	reflex selectBeverage when: status = 32 and !empty(informs) {
@@ -471,7 +486,23 @@ species Guest skills: [moving, fipa] {
 		thirsty <- 0.0;
 		status <- 100;
 	}
-
+	
+	// ****************************** ATM INTERACTIONS ******************************//
+	reflex atATM when: status = 50 and  location distance_to (ATMLocation) < 3{
+		communicationPartener <- list(ATM)[0];
+		do start_conversation to: [communicationPartener] protocol: 'fipa-contract-net' performative: 'request' contents: [defaultCash];
+		status <- 51;
+	}
+	
+	reflex withdrawing when: status = 51 and !empty(agrees){
+		message m <- agrees[0];
+		float cashWithdrawned <- m.contents[0];
+		wallet <- wallet + cashWithdrawned;
+		
+		//do end_conversation message:m contents:[];
+		needCash <- false;
+		status <- 100;
+	}
 	// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
 
 

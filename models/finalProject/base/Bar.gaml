@@ -15,7 +15,8 @@ species Bar skills: [fipa] {
 	int height <- 0;
 	int minB <- 10;
 	int maxB <- 30;
-	list<string> beverages <- ['Grappa', 'Montenegro', 'Beer', 'Wine', 'Soda', 'Cola', 'Juice', 'Julmust'];
+	list<string> beverages <- ['Grappa'	, 'Montenegro', 'Beer', 'Wine', 'Soda', 'Cola',	'Juice', 'Julmust'];
+	list<float> prices     <- [ 30.0	, 		  50.0,  45.0,    80.0,   35.0,   40.0, 	20.0, 	30.0];
 	list<float> alchoolPercentage <- [0.4, 0.23, 0.05, 0.12, 0.0, 0.0, 0.0, 0.0];
 	list<int> beverageSupply <- [rnd(minB, maxB), rnd(minB, maxB), rnd(minB, maxB), rnd(minB, maxB), rnd(minB, maxB), rnd(minB, maxB), rnd(minB, maxB), rnd(minB, maxB)];
 
@@ -35,9 +36,9 @@ species Bar skills: [fipa] {
 			do start_conversation to: list(Security) protocol: 'fipa-contract-net' performative: 'inform' contents: [g];
 		}
 		// guest not drunk, provide menu
-else {
+		else {
 		//write name+" got asked the menu! providing:"+beverages color:#orange;	
-			do reply message: m performative: "propose" contents: beverages;
+			do reply message: m performative: "propose" contents: [beverages,prices];
 		}
 
 	}
@@ -59,7 +60,6 @@ else {
 			}
 
 		} else {
-		//TODO fix response
 			do inform message: m contents: [alchoolPercentage[6]];
 		}
 
