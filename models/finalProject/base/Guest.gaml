@@ -82,6 +82,7 @@ species Guest  skills:[moving,fipa]{
 	
 
 
+
     reflex goToChillArea when: status = 0 and chill2dance < danceTrashold{
     	targetPoint<-ChillLocation;
     	status <- 2;
@@ -164,9 +165,15 @@ species Guest  skills:[moving,fipa]{
 	    		//booking table 
 	    		tableIndexUsed <- rnd (0,tableNumber-1);
 		    
+		    	if(first(tableIndexUsed,false)= nil){
+		    		write "["+name+"]("+status+") no free table found";
+		    	}
+		    	
 			    loop while: tableBookings[tableIndexUsed] { 
 		    		tableIndexUsed <- rnd (0,tableNumber-1);
 				}
+		    	
+		    	
 		    	
 	    		tableBookings[tableIndexUsed]<-true;
 	    		    		
@@ -305,7 +312,7 @@ species Guest  skills:[moving,fipa]{
     reflex gotProposal when: status = 10 and !empty(proposes)  and (proposes[0].sender = communicationPartener) {
     	message m <- proposes[0];
     	chill2dance <- chill2dance + float(m.contents[0]);
-    	// TODO end_conversation
+    	do end_conversation message:m contents:[];
     	
     	status <-99;
     }
@@ -323,7 +330,8 @@ species Guest  skills:[moving,fipa]{
     	if (flip(talkative/30) ){
     		status <- 22;
     	}else if(location distance_to(TinderLocation) > 10){
-    		status <- 100;
+    		//status <- 100;
+    		status <- 21;
     	}
     }
     
@@ -362,6 +370,10 @@ species Guest  skills:[moving,fipa]{
 	    	
 	    	tableIndexUsed <- rnd (0,tableNumber-1);
 		    
+	    	if(first(tableIndexUsed,false)= nil){
+	    		write "["+name+"]("+status+") no free table found";
+	    	}
+		    	
 		    loop while: tableBookings[tableIndexUsed] { 
 	    		tableIndexUsed <- rnd (0,tableNumber-1);
 			}
@@ -416,10 +428,6 @@ species Guest  skills:[moving,fipa]{
     	status <-28;
     }
     
-    reflex debuggingStatus23 when: status=23 and false{
-		write "["+name+"]("+status+") status distance"+location distance_to(tablePositions[tableIndexUsed]+{tableRadius,0}) color:#blue;	
-		write "["+name+"]("+status+") informs:"+informs color:#blue;
-    }
     
     //target agent arrived at table and got gender from initiator
     reflex targetAtTinderTable when:status = 23 and location distance_to(tablePositions[tableIndexUsed]+{tableRadius,0}) <= 2  and !empty(informs)  and (informs[0].sender = communicationPartener){
@@ -464,14 +472,7 @@ species Guest  skills:[moving,fipa]{
 		}
 		write "["+name+"]("+status+") updated status accordingly"  color:#red;
 	}
-	
-	reflex debugStatus25 when:status = 25{
-		write "["+name+"]("+status+") ---------- testing STATE 25"+mTemp.sender color:#violet;
-		write "["+name+"]("+status+") length(informs):"+length(informs) color:#violet;
-		if(length(informs)>0){
-				write "["+name+"]("+status+") informs[0]:"+informs[0] color:#violet;
-		}
-	}
+
 	
 	reflex targetReceivedOutcomeTinder when:status = 25 and !empty(informs)  and (informs[0].sender = communicationPartener){
 		message m <- informs[0];
@@ -599,6 +600,12 @@ species Guest  skills:[moving,fipa]{
     		loop m over: proposes{
     			do end_conversation message:m contents:[];
     		}
+    		
+    		//unbook talbe
+    		if(tableIndexUsed!= -1){
+    			tableBookings[tableIndexUsed] <- false;
+    			tableIndexUsed <- 1;
+			}
     		write "["+name+"]("+status+") length of informs"+length(informs);
     		status <- 0;
 	}
