@@ -43,6 +43,8 @@ global {
 	float communicationIncreasigFactor <- 0.1;
 	
 	float chill2danceAVG <- 0.0;
+	float chill2danceChillAVG <- 0.0;
+	float chill2dancePartyAVG <- 0.0;
 
 	init {
 	//init table positions
@@ -120,11 +122,14 @@ global {
 
 	reflex updateChill2danceAVG {
 		float sumChill2Dance <- 0.0;
+		float sumChill2PartyDance <- 0.0;
+		float sumChill2ChillDance <- 0.0;
 		if(numberOfParty >0 ){
 			list<PartyGuest> partyGuests <- list(PartyGuest);
 			
 			loop g over:partyGuests{
 				sumChill2Dance <- sumChill2Dance + g.chill2dance;
+				sumChill2PartyDance <- sumChill2PartyDance + g.chill2dance;
 			}
 		}
 		if (numberOfChill >0 ){
@@ -132,7 +137,20 @@ global {
 			
 			loop g over:chillGuests{
 				sumChill2Dance <- sumChill2Dance + g.chill2dance;
+				sumChill2ChillDance <- sumChill2ChillDance + g.chill2dance;
 			}
+		}
+		
+		if(numberOfParty > 0 ){
+			chill2dancePartyAVG <- sumChill2PartyDance/numberOfParty;
+		}else{
+			chill2dancePartyAVG <- 0.0;
+		}
+		
+		if(numberOfChill> 0 ){
+			chill2danceChillAVG <- sumChill2ChillDance/numberOfChill;
+		}else{
+			chill2danceChillAVG <- 0.0;
 		}
 		
 		if((numberOfParty + numberOfChill) > 0 ){
@@ -161,8 +179,10 @@ experiment Festival type: gui {
 		}
 
 		display "my_display" {
-		    chart "my_chart" type: series {
-				data "chill2dance AVG" value: chill2danceAVG color: #red;
+		    chart "chill2dance AVG" type: series {
+				data "chill2dance AVG" value: chill2danceAVG color: #gold;
+				data "chill2dance Party AVG" value: chill2danceChillAVG color: #red;
+				data "chill2dance Chill AVG" value: chill2dancePartyAVG color: #blue;
 	    	}
 		}
 	}
