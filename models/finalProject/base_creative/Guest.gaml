@@ -431,7 +431,7 @@ species Guest skills: [moving, fipa] {
 		message m <- informs[0];
 		bool chatResponse <- bool(m.contents[0]);
 
-		//write "["+name+"]("+status+") ++++++++++++++ IN THE FUKING STATE 25"+mTemp.sender color:#purple;
+		//write "["+name+"]("+status+") ++++++++++++++ IN THE STATE 25"+mTemp.sender color:#purple;
 		if (chatResponse) {
 			love <- 0.0;
 			status <- 99;
