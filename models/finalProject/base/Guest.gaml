@@ -473,6 +473,7 @@ species Guest skills: [moving, fipa] {
 			status <- 100;
 			//do end_conversation message:m contents:[];
 		}else{
+			wallet <- wallet - prices[selectedItem];
 			status <- 32;
 			do accept_proposal message: m contents: [selectedItem];
 		}
